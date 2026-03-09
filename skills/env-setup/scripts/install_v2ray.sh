@@ -114,33 +114,132 @@ configure_v2ray() {
     local config_dir="/usr/local/etc/v2ray"
     local config_file="$config_dir/config.json"
     
-    # Create default config if not exists
-    if [ ! -f "$config_file" ]; then
-        log INFO "Creating default configuration..."
-        
-        sudo mkdir -p "$config_dir"
-        
-        sudo tee "$config_file" > /dev/null << 'EOF'
+    # Check if config file exists
+    if [ -f "$config_file" ]; then
+        log INFO "Configuration file already exists at $config_file"
+        log WARNING "Backing up existing configuration..."
+        sudo cp "$config_file" "$config_file.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    # Create complete configuration with proxy
+    log INFO "Creating complete configuration with proxy settings..."
+    
+    sudo mkdir -p "$config_dir"
+    
+    sudo tee "$config_file" > /dev/null << 'EOF'
 {
-  "inbounds": [{
-    "port": 1080,
-    "listen": "127.0.0.1",
-    "protocol": "socks",
-    "settings": {
-      "udp": true
+  "inbounds": [
+    {
+      "listen": "0.0.0.0",
+      "port": 10808,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "userLevel": 8
+      },
+      "sniffing": {
+        "destOverride": [
+          "http",
+          "tls"
+        ],
+        "enabled": true,
+        "routeOnly": false
+      },
+      "tag": "socks"
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": 10809,
+      "protocol": "http",
+      "settings": {
+        "userLevel": 8
+      },
+      "tag": "http"
     }
-  }],
-  "outbounds": [{
-    "protocol": "freedom",
-    "settings": {}
-  }]
+  ],
+  "log": {
+    "loglevel": "warning"
+  },
+  "outbounds": [
+    {
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "gitee.yianchenyianchen.xyz",
+            "port": 443,
+            "users": [
+              {
+                "id": "b831381d-6324-4d53-ad4f-8cda48b30811"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "sockopt": {
+          "keepAlive": 30
+        }
+      }
+    },
+    {
+      "protocol": "freedom",
+      "tag": "direct"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPOnDemand",
+    "rules": [
+      {
+        "type": "field",
+        "ip": [
+          "geoip:private"
+        ],
+        "outboundTag": "direct"
+      },
+      {
+        "domain": [
+          "geosite:private"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "domain": [
+          "domain:alidns.com",
+          "domain:doh.pub",
+          "domain:dot.pub",
+          "domain:360.cn",
+          "domain:onedns.net"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "ip": [
+          "geoip:cn"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      },
+      {
+        "domain": [
+          "geosite:cn"
+        ],
+        "outboundTag": "direct",
+        "type": "field"
+      }
+    ]
+  }
 }
 EOF
-        
-        log SUCCESS "Default configuration created at $config_file"
-    else
-        log INFO "Configuration file already exists at $config_file"
-    fi
+    
+    log SUCCESS "Configuration created at $config_file"
+    log INFO "  SOCKS5 proxy: 0.0.0.0:10808"
+    log INFO "  HTTP proxy:   0.0.0.0:10809"
     
     return 0
 }
@@ -194,6 +293,63 @@ verify_installation() {
     fi
 }
 
+# Test proxy connectivity
+test_connectivity() {
+    log INFO "Testing proxy connectivity..."
+    
+    # Wait for service to fully start
+    sleep 3
+    
+    # Test SOCKS5 proxy with Google
+    log STEP "Testing connection to Google via SOCKS5 proxy..."
+    local test_result
+    
+    if [ "$(uname)" = "Darwin" ]; then
+        # macOS doesn't have systemd, assume manual start
+        test_result="skip"
+    else
+        # Test SOCKS5 proxy
+        if timeout 10 curl -x socks5://127.0.0.1:10808 -I https://www.google.com 2>&1 | grep -q "HTTP"; then
+            log SUCCESS "Google connection via SOCKS5 proxy: OK"
+            test_result="success"
+        else
+            log WARNING "Google connection via SOCKS5 proxy: FAILED"
+            test_result="failed"
+        fi
+    fi
+    
+    # Test HTTP proxy
+    log STEP "Testing connection to GitHub via HTTP proxy..."
+    if timeout 10 curl -x http://127.0.0.1:10809 -I https://github.com 2>&1 | grep -q "HTTP"; then
+        log SUCCESS "GitHub connection via HTTP proxy: OK"
+    else
+        log WARNING "GitHub connection via HTTP proxy: FAILED"
+    fi
+    
+    # Display usage information
+    echo ""
+    log INFO "========================================="
+    log INFO "Proxy Configuration"
+    log INFO "========================================="
+    log INFO "SOCKS5 Proxy: 127.0.0.1:10808"
+    log INFO "HTTP Proxy:   127.0.0.1:10809"
+    log INFO ""
+    log INFO "Usage Examples:"
+    log INFO "  curl -x socks5://127.0.0.1:10808 https://www.google.com"
+    log INFO "  export ALL_PROXY=socks5://127.0.0.1:10808"
+    log INFO ""
+    log INFO "Note: ping command does NOT use proxy (ICMP limitation)"
+    log INFO "========================================="
+    
+    if [ "$test_result" = "success" ]; then
+        return 0
+    elif [ "$test_result" = "skip" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 # Main installation function
 main() {
     local log_file=$(init_log "v2ray")
@@ -205,8 +361,8 @@ main() {
     log STEP "Installation log: $log_file"
     echo ""
     
-    # Initialize progress (6 steps)
-    init_progress 6
+    # Initialize progress (7 steps)
+    init_progress 7
     
     # Redirect all output to log file
     exec > >(tee -a "$log_file") 2>&1
@@ -264,6 +420,17 @@ main() {
     else
         update_progress "Verifying Installation" "error"
         exit 1
+    fi
+    
+    # Step 7: Test connectivity
+    update_progress "Testing Proxy Connectivity" "running"
+    if test_connectivity; then
+        update_progress "Testing Proxy Connectivity" "success"
+    else
+        update_progress "Testing Proxy Connectivity" "error"
+        log WARNING "Proxy installed but connectivity test failed"
+        log WARNING "This might be normal if network is restricted"
+        # Don't exit on connectivity failure, just warn
     fi
     
     # Generate report

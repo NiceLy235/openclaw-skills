@@ -138,7 +138,38 @@ v2ray run -c /usr/local/etc/v2ray/config.json
 
 **Configuration:**
 - Config file: `/usr/local/etc/v2ray/config.json`
-- Default proxy: SOCKS5 on `127.0.0.1:1080`
+- SOCKS5 proxy: `127.0.0.1:10808`
+- HTTP proxy: `127.0.0.1:10809`
+- Includes complete proxy configuration with routing rules
+- Automatic backup of existing configuration
+
+**Connectivity Test:**
+
+The installation automatically tests proxy connectivity:
+- Tests Google access via SOCKS5 proxy
+- Tests GitHub access via HTTP proxy
+- Reports success/failure for troubleshooting
+
+**Using the Proxy:**
+
+```bash
+# Method 1: Specify proxy for single command
+curl -x socks5://127.0.0.1:10808 https://www.google.com
+wget -e use_proxy=yes -e https_proxy=127.0.0.1:10809 https://github.com
+
+# Method 2: Set environment variable (recommended)
+export ALL_PROXY=socks5://127.0.0.1:10808
+curl https://www.google.com  # Automatically uses proxy
+
+# Method 3: Permanent configuration
+echo 'export ALL_PROXY=socks5://127.0.0.1:10808' >> ~/.bashrc
+source ~/.bashrc
+```
+
+**Important Notes:**
+- ❌ `ping` command does NOT use proxy (ICMP protocol limitation)
+- ✅ Use `curl` or `wget` with proxy to test connectivity
+- ✅ Configure browser or applications to use SOCKS5/HTTP proxy
 
 **For advanced configuration**, see [references/v2ray_guide.md](references/v2ray_guide.md)
 

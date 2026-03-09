@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.2.0] - 2026-03-09
+
+### Added
+- **Complete V2Ray Configuration**: Pre-configured proxy settings with SOCKS5 and HTTP support
+  - SOCKS5 proxy on port 10808
+  - HTTP proxy on port 10809
+  - Automatic routing rules for Chinese domains (direct connection)
+  - VMess protocol configuration for proxy server
+- **Connectivity Testing**: Automatic proxy connectivity verification
+  - Tests Google access via SOCKS5 proxy
+  - Tests GitHub access via HTTP proxy
+  - Provides detailed usage examples
+- **Configuration Backup**: Automatic backup of existing V2Ray configuration
+- **Enhanced Documentation**: Complete proxy usage guide in SKILL.md
+
+### Improved
+- **V2Ray Installation**: Now 7 steps instead of 6 (added connectivity test)
+- **User Experience**: Clear guidance on proxy usage (ping limitation explained)
+
 ## [1.1.0] - 2026-03-09
 
 ### Added
