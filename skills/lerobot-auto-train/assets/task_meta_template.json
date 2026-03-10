@@ -1,0 +1,48 @@
+{
+  "task_id": "train_YYYYMMDD_HHMMSS_uuid8",
+  "task_type": "bc",
+  "status": "pending",
+  "priority": 5,
+  "config": {
+    "data_sources": [],
+    "model_name": "",
+    "output_dir": "./output",
+    "epochs": 100,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "device": "cuda",
+    "save_freq": 10,
+    "eval_freq": 10,
+    "num_workers": 4,
+    "wandb_enable": false,
+    "push_to_hub": false,
+    "train_expert_only": false
+  },
+  "execution": {
+    "background": true,
+    "progress_interval": 60,
+    "notify_on_complete": false
+  },
+  "progress": {
+    "current_epoch": 0,
+    "total_epochs": 100,
+    "train_loss": null,
+    "val_loss": null,
+    "best_val_loss": null,
+    "elapsed_time": "0m",
+    "estimated_remaining": "calculating..."
+  },
+  "resource": {
+    "gpu_utilization": "N/A",
+    "gpu_memory_used": "N/A",
+    "cpu_usage": "N/A"
+  },
+  "timestamps": {
+    "submitted": "YYYY-MM-DDTHH:MM:SS",
+    "started": null,
+    "completed": null
+  },
+  "pid": null,
+  "log_file": null,
+  "checkpoint_dir": null
+}
