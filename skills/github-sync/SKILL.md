@@ -277,6 +277,21 @@ tail -100 ~/.openclaw/github_sync.log
 
 ## 🔄 Manual Operations
 
+### Update and Sync Skill (One Command)
+
+```bash
+# Update skill and auto-sync to GitHub
+./update_skill.sh <skill_name> "commit message"
+
+# Example
+./update_skill.sh env-setup "Add Python 3.12 support"
+```
+
+This will:
+1. ✅ Commit skill changes
+2. ✅ Sync to GitHub immediately
+3. ✅ Send real-time progress updates
+
 ### Force Push
 
 ```bash
@@ -332,6 +347,17 @@ tail -100 ~/.openclaw/github_sync.log
 4. **Monitor sync logs**:
    ```bash
    tail -f ~/.openclaw/github_sync.log
+   ```
+
+5. **After updating ANY skill, sync to GitHub**:
+   ```bash
+   # One command to update and sync
+   ./update_skill.sh <skill_name> "your commit message"
+   
+   # Or manual steps:
+   git add skills/YOUR_SKILL/
+   git commit -m "feat: Your changes"
+   ./sync_skills.sh
    ```
 
 ## 🚀 Advanced Usage

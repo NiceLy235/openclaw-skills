@@ -403,6 +403,75 @@ This unifies:
 
 ---
 
+## 🔄 Skill Updates - Auto-Sync to GitHub
+
+**AFTER updating any skill, ALWAYS sync to GitHub immediately.**
+
+### Workflow
+
+```bash
+# 1. Update skill
+cd ~/.openclaw/workspace
+# Make changes to skill files...
+
+# 2. Commit changes
+git add skills/YOUR_SKILL/
+git commit -m "feat: Update YOUR_SKILL with new features"
+
+# 3. Auto-sync to GitHub (MANDATORY)
+cd skills/github-sync/scripts
+./sync_skills.sh
+```
+
+### Automated Script
+
+Use the wrapper script for one-command update + sync:
+
+```bash
+# Update and sync in one command
+./update_skill.sh <skill_name> "commit message"
+```
+
+### What Triggers Sync
+
+- ✅ Creating new skill
+- ✅ Updating existing skill
+- ✅ Fixing bugs in skill
+- ✅ Adding new features to skill
+- ✅ Updating skill documentation
+
+### Example Session
+
+```bash
+# User: "Update env-setup skill to support Python 3.12"
+
+# 1. Make changes
+cd ~/.openclaw/workspace/skills/env-setup
+# Edit files...
+
+# 2. Commit
+git add .
+git commit -m "feat: Add Python 3.12 support to env-setup"
+
+# 3. Sync to GitHub (MANDATORY)
+cd ../github-sync/scripts
+./sync_skills.sh
+
+# User sees: "✅ Skills synced to GitHub"
+```
+
+### Why Auto-Sync?
+
+- ✅ **Backup**: Skills are safely stored on GitHub
+- ✅ **Version Control**: Track all changes over time
+- ✅ **Sharing**: Easy to share skills across machines
+- ✅ **Collaboration**: Team can access updated skills
+- ✅ **Recovery**: Can restore from GitHub if needed
+
+**No skill update is complete until it's on GitHub.**
+
+---
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
