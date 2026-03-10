@@ -211,6 +211,26 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
 
 **ALWAYS provide real-time feedback for long-running commands (>10 seconds).**
 
+### ✅ NEW: Use Active Message Pushing
+
+**For tasks >10s, use `message` tool to send progress updates:**
+
+```bash
+# Step 1: Immediate notification
+message(action="send", message="🚀 开始执行任务...")
+
+# Step 2: Execute first part
+exec(command, { yieldMs: 10000 })
+message(action="send", message="✅ 步骤 1/3 完成")
+
+# Step 3: Execute second part
+exec(another_command)
+message(action="send", message="✅ 步骤 2/3 完成")
+
+# Step 4: Final result
+message(action="send", message="🎉 全部完成！结果：...")
+```
+
 ### ❌ Wrong Way
 ```bash
 # Execute with long timeout, wait for complete
@@ -226,23 +246,39 @@ exec(command, { yieldMs: 10000 })  # 10 seconds
 # 2. Poll frequently with short timeouts
 process poll (timeout: 5000)  # Every 5 seconds
 
-# 3. Report progress to user
+# 3. Send progress updates using message tool
+message(action="send", message="进度: X% - 正在处理...")
+
 # 4. Continue polling until complete
 ```
 
 ### Progress Report Rules
 - **Quick commands (<10s)**: Wait for completion
-- **Medium commands (10-60s)**: Poll 2-3 times, report status
-- **Long commands (>1min)**: Continuous polling + progress updates
-- **Unknown duration**: Adaptive polling, start with 5s intervals
+- **Medium commands (10-60s)**: Send 2-3 updates
+- **Long commands (>1min)**: Continuous updates every 10-30s
+- **Unknown duration**: Adaptive updates, start with 10s intervals
 
 ### What to Report
-- ✅ Command started: "开始执行 XXX，预计 Y 分钟"
-- ✅ Progress updates: "进度: X% - 正在处理..."
-- ✅ Errors immediately: "遇到错误: ..."
-- ✅ Completion summary: "✅ 完成，结果: ..."
+- ✅ **IMMEDIATE**: "开始执行 XXX" (use message tool)
+- ✅ **PROGRESS**: "进度: X%" (use message tool)
+- ✅ **ERRORS**: "遇到错误: ..." (use message tool immediately)
+- ✅ **COMPLETION**: "✅ 完成，结果: ..." (use message tool)
 
-**User experience first. No silent long waits.**
+### Example: Training Task
+```python
+# 1. Start
+message("🚀 训练已启动 (PID: 12345)")
+
+# 2. Monitor and update
+for i in range(steps):
+    if i % 10 == 0:
+        message(f"📊 Step {i}/{total} | Loss: {loss:.3f}")
+    
+# 3. Complete
+message("✅ 训练完成！最佳 Loss: 0.195")
+```
+
+**User experience first. Active communication, not silent waits.**
 
 ---
 
