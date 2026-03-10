@@ -1,11 +1,44 @@
 ---
 name: env-setup
-description: "Automatically set up development environments on new machines. Supports v2ray proxy and lerobot robot learning framework with full dependency installation, configuration, and verification. Use when: (1) Setting up a new development machine, (2) Installing v2ray for network proxy, (3) Installing lerobot for robot learning, (4) Automating environment setup tasks, (5) User mentions 'setup environment', 'install v2ray', 'install lerobot', or asks to configure development tools."
+description: >
+  Automatically set up development environments on new machines with dependency
+  conflict resolution and proxy configuration. Supports v2ray proxy and lerobot
+  robot learning framework. Enhanced version handles PyTorch/torchvision version
+  mismatches, dependency conflicts, and network proxy setup automatically.
+  
+  Use when: (1) Setting up a new development machine, (2) Installing v2ray for
+  network proxy, (3) Installing lerobot for robot learning, (4) Fixing dependency
+  conflicts, (5) Configuring proxy for HuggingFace access, (6) User mentions
+  'setup environment', 'install v2ray', 'install lerobot', 'fix dependencies',
+  or asks to configure development tools.
 ---
 
 # Environment Setup Skill
 
 Automate the installation and configuration of development environments on Ubuntu/Debian/macOS systems.
+
+## ✨ Key Features
+
+### 🔧 Automatic Dependency Resolution
+- ✅ Detects and fixes PyTorch/torchvision version mismatches
+- ✅ Resolves huggingface-hub, protobuf, packaging conflicts
+- ✅ Installs all required dependencies (num2words, transformers, etc.)
+- ✅ Verifies package compatibility
+
+### 🌐 Smart Proxy Configuration
+- ✅ Auto-detects V2Ray proxy (SOCKS5/HTTP)
+- ✅ Configures environment for HuggingFace access
+- ✅ Tests network connectivity before installation
+
+### 🎯 CUDA-Aware Installation
+- ✅ Detects CUDA version automatically
+- ✅ Installs matching PyTorch version
+- ✅ Falls back to CPU mode if no GPU
+
+### 📊 Comprehensive Verification
+- ✅ Tests all imports and dependencies
+- ✅ Verifies CUDA functionality
+- ✅ Generates detailed reports
 
 ## Supported Environments
 
@@ -20,8 +53,26 @@ Automate the installation and configuration of development environments on Ubunt
 # Install v2ray
 bash scripts/install_v2ray.sh
 
-# Install lerobot
+# Install lerobot (enhanced version with dependency resolution)
+bash scripts/install_lerobot_enhanced.sh
+
+# Legacy version (if you prefer)
 bash scripts/install_lerobot.sh
+```
+
+### Fix Dependency Conflicts
+
+If you already have lerobot installed but encountering issues:
+
+```bash
+# Check for conflicts
+python3 scripts/resolve_dependencies.py --check
+
+# Automatically fix conflicts
+python3 scripts/resolve_dependencies.py --fix
+
+# Generate detailed report
+python3 scripts/resolve_dependencies.py --report
 ```
 
 ### Check System Requirements
@@ -36,25 +87,37 @@ bash scripts/check_environment.sh lerobot
 
 Each installation follows these steps with **real-time progress display**:
 
-1. **Environment Detection**
+1. **Network & Proxy Check** (New!)
+   - Detect V2Ray proxy (SOCKS5/HTTP)
+   - Test HuggingFace connectivity
+   - Configure proxy automatically
+
+2. **Environment Detection**
    - Check OS version and architecture
    - Verify disk space (minimum 2GB)
    - Test network connectivity
    - Detect existing installations
 
-2. **Dependency Installation**
+3. **CUDA Detection** (Enhanced!)
+   - Auto-detect CUDA version
+   - Map to correct PyTorch index
+   - Verify GPU functionality
+
+4. **Smart Dependency Installation** (Enhanced!)
    - Install required system packages
    - Set up Python environment (for lerobot)
-   - Install CUDA support if available
+   - Install PyTorch with correct CUDA version
+   - Resolve version conflicts automatically
 
-3. **Main Program Installation**
+5. **Main Program Installation**
    - Download and install the software
-   - Configure default settings
-   - Set up system services (for v2ray)
+   - Install all required dependencies
+   - Handle version constraints
 
-4. **Verification**
-   - Test installation integrity
-   - Verify service status
+6. **Comprehensive Verification** (Enhanced!)
+   - Test PyTorch/torchvision compatibility
+   - Verify all imports
+   - Test CUDA operations
    - Generate installation report
 
 ### Progress Display Features
@@ -173,12 +236,14 @@ source ~/.bashrc
 
 **For advanced configuration**, see [references/v2ray_guide.md](references/v2ray_guide.md)
 
+## Environment-Specific Usage
+
 ### LeRobot
 
 **After Installation:**
 
 ```bash
-# Activate environment
+# Activate environment (with auto proxy configuration)
 source ~/opt/lerobot/activate.sh
 
 # Or manually
@@ -187,11 +252,33 @@ source ~/opt/lerobot/venv/bin/activate
 # Verify installation
 python3 -c "import lerobot; print(lerobot.__version__)"
 python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+
+# Check for dependency issues
+python3 ~/.openclaw/workspace/skills/env-setup/scripts/resolve_dependencies.py --check
 ```
 
 **GPU Support:**
 - Automatically detects and configures CUDA if available
 - Falls back to CPU-only mode if no GPU detected
+- Verifies PyTorch/torchvision compatibility
+
+**Proxy Support:**
+- Activation script automatically configures proxy if V2Ray is running
+- Ensures HuggingFace models can be downloaded
+- Tests network connectivity
+
+**Troubleshooting:**
+
+If you encounter dependency issues:
+```bash
+# Run diagnostic tool
+python3 scripts/resolve_dependencies.py --report
+
+# Fix conflicts automatically
+python3 scripts/resolve_dependencies.py --fix
+```
+
+For detailed troubleshooting, see [references/troubleshooting_lerobot.md](references/troubleshooting_lerobot.md)
 
 **For detailed usage**, see [references/lerobot_guide.md](references/lerobot_guide.md)
 
@@ -204,10 +291,14 @@ The scripts handle these common errors:
 | Network failure | Retry 3 times with delay |
 | Disk space insufficient | Alert user, stop installation |
 | Permission denied | Prompt for sudo or directory change |
-| Dependency conflict | Stop and report details |
+| Dependency conflict | **Auto-resolve version conflicts** |
+| PyTorch version mismatch | **Auto-reinstall matching versions** |
+| Missing packages | **Auto-install all required deps** |
+| HuggingFace inaccessible | **Auto-configure proxy** |
 | Already installed | Skip or offer to reinstall |
+| CUDA not available | **Fall back to CPU mode** |
 
-**For troubleshooting**, see [references/troubleshooting.md](references/troubleshooting.md)
+**For troubleshooting**, see [references/troubleshooting_lerobot.md](references/troubleshooting_lerobot.md)
 
 ## Extending the Skill
 
@@ -232,9 +323,43 @@ To add support for a new environment:
 | `scripts/common_utils.sh` | Shared functions (logging, retries, etc.) |
 | `scripts/check_environment.sh` | System requirements validation |
 | `scripts/install_v2ray.sh` | V2Ray installation automation |
-| `scripts/install_lerobot.sh` | LeRobot installation automation |
+| `scripts/install_lerobot.sh` | LeRobot installation (basic) |
+| `scripts/install_lerobot_enhanced.sh` | **LeRobot installation (enhanced with conflict resolution)** |
+| `scripts/resolve_dependencies.py` | **Dependency conflict detection and resolution** |
 
 All scripts are idempotent and can be safely run multiple times.
+
+## Common Issues and Solutions
+
+### Issue 1: PyTorch/torchvision Version Mismatch
+
+**Symptom**: `RuntimeError: operator torchvision::nms does not exist`
+
+**Solution**:
+```bash
+python3 scripts/resolve_dependencies.py --fix
+```
+
+### Issue 2: Cannot Access HuggingFace
+
+**Symptom**: `OSError: Can't load processor for ...`
+
+**Solution**:
+1. Start V2Ray: `sudo systemctl start v2ray`
+2. Use activation script: `source ~/opt/lerobot/activate.sh`
+3. Or manually: `export HTTPS_PROXY=http://127.0.0.1:10809`
+
+### Issue 3: Missing Dependencies
+
+**Symptom**: `ImportError: Package 'num2words' is required`
+
+**Solution**:
+```bash
+source ~/opt/lerobot/venv/bin/activate
+pip install num2words transformers accelerate sentencepiece
+```
+
+For more issues, see [references/troubleshooting_lerobot.md](references/troubleshooting_lerobot.md)
 
 ## System Requirements
 
