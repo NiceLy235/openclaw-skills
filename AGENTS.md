@@ -246,6 +246,70 @@ process poll (timeout: 5000)  # Every 5 seconds
 
 ---
 
+## 🧠 Daily Memory System
+
+**Automatically save operations and conversations to GitHub as persistent memory.**
+
+### When to Save
+
+**Always save**:
+- ✅ Completed important tasks → `save_conversation.py interaction`
+- ✅ Fixed errors → Save error + solution + lessons
+- ✅ Created/modified skills → Save operation record
+- ✅ User says "记住这个" → Save as experience
+
+### Daily Workflow
+
+1. **During the day**: Auto-save important interactions
+2. **Evening (23:00)**: Generate daily summary
+3. **Auto-commit & push**: Upload to GitHub
+
+### Commands
+
+```bash
+# Quick log
+python daily_summary/scripts/save_conversation.py log "Fixed CUDA issue"
+
+# Save interaction
+python daily_summary/scripts/save_conversation.py interaction \
+  --type "error_fix" \
+  --details '{"error": "...", "fix": "..."}' \
+  --outcome "✅ Fixed" \
+  --lessons "Always check nvidia-smi first"
+
+# Generate summary (auto-run by heartbeat)
+python daily_summary/scripts/daily_sync.py run
+
+# Check status
+python daily_summary/scripts/daily_sync.py status
+```
+
+### Integration with Heartbeat
+
+Add to `HEARTBEAT.md`:
+```markdown
+# Daily Tasks
+- [ ] Generate daily summary at 23:00
+- [ ] Push memory to GitHub
+```
+
+In heartbeat check:
+```python
+if current_time > "23:00" and last_sync != today:
+    run_daily_sync()
+```
+
+### Benefits
+
+- 📚 **Persistent memory**: Never forget past experiences
+- 🔍 **Searchable**: Find past solutions quickly
+- 📈 **Learning**: Identify patterns and improve
+- 🚫 **Avoid repetition**: Don't repeat same mistakes
+
+**Memory is precious. Save it daily.**
+
+---
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.

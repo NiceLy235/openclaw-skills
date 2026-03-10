@@ -1,0 +1,23 @@
+{
+  "github": {
+    "repo_url": "https://github.com/NiceLy235/openclaw-memory.git",
+    "branch": "main",
+    "commit_message_template": "chore: Daily memory update - {date}"
+  },
+  "paths": {
+    "conversations": "conversations",
+    "daily_summaries": "daily",
+    "experiences": "experiences",
+    "errors": "errors"
+  },
+  "schedule": {
+    "summary_time": "23:00",
+    "push_time": "23:30",
+    "timezone": "Asia/Shanghai"
+  },
+  "retention": {
+    "keep_conversations_days": 30,
+    "keep_summaries_days": 365,
+    "keep_experiences_days": 365
+  }
+}
