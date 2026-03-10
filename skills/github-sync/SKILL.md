@@ -441,3 +441,8 @@ git remote set-url origin https://TOKEN@github.com/USER/REPO.git
 ### Community
 - GitHub Issues: [Report bugs]
 - Discord: https://discord.gg/clawd
+
+## 🔄 Auto-Sync Feature
+
+每次更新 skill 后自动同步到 GitHub！
+
