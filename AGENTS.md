@@ -310,6 +310,63 @@ if current_time > "23:00" and last_sync != today:
 
 ---
 
+## 🔄 GitHub Sync - Unified Repository Management
+
+**Automatically sync memories and skills to GitHub.**
+
+### Quick Setup
+
+```bash
+cd ~/.openclaw/workspace/skills/github-sync/scripts
+./setup_repos.sh
+```
+
+### Sync Commands
+
+```bash
+# Sync memory only (daily at 23:00)
+./sync_memory.sh
+
+# Sync skills only (manual)
+./sync_skills.sh
+
+# Sync everything
+./sync_all.sh
+
+# Check status
+./sync_status.sh
+```
+
+### What Gets Synced
+
+**Memory Repository** (`training-memories`):
+- Daily conversations
+- Daily summaries
+- Experiences and lessons learned
+
+**Skills Repository** (your configured repo):
+- All custom skills (env-setup, lerobot-auto-train, github-sync)
+- Daily memory system
+- Workspace configurations
+
+### Automatic Schedule
+
+```
+Memory sync:  Daily at 23:00 (automatic)
+Skills sync:  Manual or configured schedule
+```
+
+### Integration
+
+This unifies:
+- Daily memory system (memory/)
+- All skills (skills/)
+- Workspace backup
+
+**One skill to sync them all.**
+
+---
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
