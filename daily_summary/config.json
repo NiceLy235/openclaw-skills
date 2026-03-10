@@ -1,6 +1,6 @@
 {
   "github": {
-    "repo_url": "https://github.com/NiceLy235/openclaw-memory.git",
+    "repo_url": "https://github.com/NiceLy235/training-memories.git",
     "branch": "main",
     "commit_message_template": "chore: Daily memory update - {date}"
   },
