@@ -1,0 +1,48 @@
+{
+  "repositories": {
+    "memory": {
+      "name": "OpenClaw Training Memories",
+      "url": "https://github.com/NiceLy235/training-memories.git",
+      "branch": "main",
+      "local_path": "~/.openclaw/memory",
+      "sync_enabled": true,
+      "schedule": "daily",
+      "commit_message_template": "chore: Daily memory update - {date}"
+    },
+    "skills": {
+      "name": "OpenClaw Skills",
+      "url": null,
+      "branch": "main",
+      "local_path": "~/.openclaw/workspace",
+      "sync_enabled": true,
+      "schedule": "on_demand",
+      "commit_message_template": "feat: Skills and workspace update - {date}"
+    }
+  },
+  "proxy": {
+    "enabled": true,
+    "auto_detect": true,
+    "http": "http://127.0.0.1:10809",
+    "socks5": "socks5://127.0.0.1:10808"
+  },
+  "schedule": {
+    "memory_sync_time": "23:00",
+    "skills_sync_cron": null
+  },
+  "sync": {
+    "auto_commit": true,
+    "auto_push": true,
+    "conflict_resolution": "prefer_local",
+    "dry_run": false
+  },
+  "logging": {
+    "enabled": true,
+    "log_file": "~/.openclaw/github_sync.log",
+    "log_level": "INFO",
+    "max_log_size_mb": 10
+  },
+  "retention": {
+    "keep_sync_logs_days": 30,
+    "keep_backup_count": 5
+  }
+}
