@@ -29,6 +29,18 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Configure git proxy (uses V2Ray HTTP proxy)
+configure_proxy() {
+    if ss -tlnp | grep -q ":10809"; then
+        log_info "Configuring Git to use V2Ray proxy..."
+        git config --local http.proxy http://127.0.0.1:10809
+        git config --local https.proxy http://127.0.0.1:10809
+    else
+        log_warn "V2Ray proxy not detected on port 10809"
+        log_warn "If push fails, check V2Ray status: systemctl status v2ray"
+    fi
+}
+
 # Check if git is installed
 if ! command -v git &> /dev/null; then
     log_error "Git is not installed"
@@ -60,6 +72,9 @@ if [ ! -d "$MEMORY_DIR/.git" ]; then
 fi
 
 cd "$MEMORY_DIR"
+
+# Configure proxy
+configure_proxy
 
 # Check if there are changes
 if [ -z "$(git status --porcelain)" ]; then
