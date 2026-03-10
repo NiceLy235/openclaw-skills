@@ -20,6 +20,8 @@ Automate complete training lifecycle: data preparation → training → validati
 - ✅ Automatic checkpoint and recovery
 - ✅ Environment validation
 - ✅ Inference testing
+- ✅ Automatic validation during training
+- ✅ Loss curve visualization
 
 ## Prerequisites
 
@@ -232,6 +234,60 @@ python scripts/inference_test.py ./output/model.pt single --input '{"obs": "test
    python scripts/inference_test.py ./output/model.pt full
    ```
 
+8. **View loss curves** (auto-generated):
+   ```bash
+   # Training and validation loss curves
+   ls output/loss_curves.png
+   ls output/loss_curves_combined.png
+   
+   # Or manually generate
+   python scripts/validate_and_plot.py \
+     --output-dir ./output \
+     --plot-only
+   ```
+
+### Validation During Training
+
+**Automatic validation** happens at every checkpoint save:
+- ✅ Validates on validation set
+- ✅ Records validation loss
+- ✅ Tracks best validation loss
+- ✅ Generates loss curves on completion
+
+**Manual validation**:
+```bash
+python scripts/validate_and_plot.py \
+  --model-path ./output/checkpoints/checkpoint_010000.pt \
+  --val-data ./processed_data/val/ \
+  --output-dir ./output \
+  --step 10000 \
+  --epoch 10
+```
+
+**Plot only** (skip validation):
+```bash
+python scripts/validate_and_plot.py \
+  --output-dir ./output \
+  --plot-only
+```
+
+**Combined plot** (train + val on same axis):
+```bash
+python scripts/validate_and_plot.py \
+  --output-dir ./output \
+  --plot-only \
+  --plot-combined
+```
+
+**Output files**:
+```
+output/
+├── loss_history.json           # Loss data (train + val)
+├── loss_curves.png             # Separate train/val curves
+├── loss_curves.pdf             # High-quality PDF
+└── loss_curves_combined.png    # Combined train/val curves
+```
+
 ### Real-Time Feedback Pattern
 
 **IMPORTANT**: Provide real-time feedback during long operations.
@@ -328,6 +384,10 @@ See `references/config_schema.md` for complete schema.
 
 - `check_environment.py` - Validate and fix environment
 
+### Data Preparation
+
+- `prepare_dataset.py` - Split dataset into train/val sets
+
 ### Task Management
 
 - `task_manager.py` - Submit/manage tasks
@@ -336,6 +396,10 @@ See `references/config_schema.md` for complete schema.
 ### Training
 
 - `train_worker.py` - Training worker (internal)
+
+### Validation and Plotting
+
+- `validate_and_plot.py` - Validate model and plot loss curves
 
 ### Inference
 
@@ -376,8 +440,12 @@ output/
 │   ├── best_model.pt     # Best validation model
 │   ├── checkpoint_epoch_10.pt
 │   └── checkpoint_epoch_20.pt
-└── logs/
-    └── training.log      # Training logs
+├── logs/
+│   └── training.log      # Training logs
+├── loss_history.json     # Train/val loss history
+├── loss_curves.png       # Loss curves (separate)
+├── loss_curves.pdf       # High-quality PDF
+└── loss_curves_combined.png  # Combined train/val curves
 
 ~/.openclaw/tasks/<task_id>/
 ├── meta.json             # Task metadata
@@ -389,6 +457,7 @@ output/
 For detailed information:
 
 - **Dataset preparation**: `references/dataset_preparation.md`
+- **Loss curve visualization**: `references/loss_curve_visualization.md`
 - **Task states**: `references/task_states.md`
 - **Error handling**: `references/error_handling.md`
 - **Config schema**: `references/config_schema.md`
