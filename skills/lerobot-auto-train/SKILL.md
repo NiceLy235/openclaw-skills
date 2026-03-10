@@ -32,6 +32,57 @@ cd /path/to/lerobot_ros2
 
 ## Quick Start
 
+### 0. Prepare Dataset
+
+**CRITICAL**: Prepare training/validation split BEFORE training.
+
+**Minimal** (with auto-split):
+```bash
+python scripts/prepare_dataset.py \
+  --data-dir /path/to/raw_data \
+  --output-dir ./processed_data \
+  --train-ratio 0.8
+```
+
+**Full parameters**:
+```bash
+python scripts/prepare_dataset.py \
+  --data-dir /path/to/raw_data \
+  --output-dir ./processed_data \
+  --train-ratio 0.8 \
+  --random-seed 42 \
+  --validate
+```
+
+**What it does**:
+1. Scans all episodes in `--data-dir`
+2. Randomly splits into train/val sets
+3. Copies to `--output-dir/train/` and `--output-dir/val/`
+4. Generates `split_info.json` with split details
+
+**Output structure**:
+```
+processed_data/
+├── train/
+│   ├── episode_001/
+│   ├── episode_002/
+│   └── ...
+├── val/
+│   ├── episode_001/
+│   └── ...
+└── split_info.json
+```
+
+**For training**, use:
+```bash
+--data-sources processed_data/train/
+```
+
+**For validation**, use:
+```bash
+--validation-data processed_data/val/
+```
+
 ### 1. Check Environment
 
 Always verify environment first:
@@ -147,24 +198,36 @@ python scripts/inference_test.py ./output/model.pt single --input '{"obs": "test
    cd /path/to/lerobot_ros2
    ```
 
-2. **Check environment**:
+2. **Prepare dataset** (if not already done):
+   ```bash
+   python scripts/prepare_dataset.py \
+     --data-dir /path/to/raw_data \
+     --output-dir ./processed_data \
+     --train-ratio 0.8 \
+     --validate
+   ```
+
+3. **Check environment**:
    ```bash
    python scripts/check_environment.py
    ```
 
-3. **Submit task** (runs in background):
+4. **Submit task** (runs in background):
    ```bash
-   python scripts/task_manager.py submit ... --background
+   python scripts/task_manager.py submit \
+     --data-sources ./processed_data/train/ \
+     --validation-data ./processed_data/val/ \
+     --background
    ```
 
-4. **Continue other work** while training runs
+5. **Continue other work** while training runs
 
-5. **Check progress** periodically:
+6. **Check progress** periodically:
    ```bash
    python scripts/progress_monitor.py <task_id>
    ```
 
-6. **Test model** when complete:
+7. **Test model** when complete:
    ```bash
    python scripts/inference_test.py ./output/model.pt full
    ```
@@ -325,6 +388,7 @@ output/
 
 For detailed information:
 
+- **Dataset preparation**: `references/dataset_preparation.md`
 - **Task states**: `references/task_states.md`
 - **Error handling**: `references/error_handling.md`
 - **Config schema**: `references/config_schema.md`
@@ -349,6 +413,20 @@ For detailed information:
 
 "Starting training pipeline..."
 
+# 0. Prepare dataset (if not already done)
+$ python scripts/prepare_dataset.py \
+  --data-dir data/raw_episodes \
+  --output-dir ./processed_data \
+  --train-ratio 0.8
+📂 Step 1: Collecting episodes...
+   Found 5 episodes
+📊 Step 3: Splitting dataset (train=80%)
+   Training set: 4 episodes
+   Validation set: 1 episodes
+✅ Dataset preparation complete!
+Training set: ./processed_data/train/ (4 episodes)
+Validation set: ./processed_data/val/ (1 episodes)
+
 # 1. Check environment
 $ python scripts/check_environment.py
 ✅ Environment ready
@@ -356,8 +434,8 @@ $ python scripts/check_environment.py
 # 2. Submit task
 $ python scripts/task_manager.py submit \
   --task-type bc \
-  --data-sources data/episode1.h5 data/episode2.h5 \
-    data/episode3.h5 data/episode4.h5 data/episode5.h5 \
+  --data-sources ./processed_data/train/ \
+  --validation-data ./processed_data/val/ \
   --model-name smolvla_base \
   --epochs 100 \
   --background
