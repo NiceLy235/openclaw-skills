@@ -1,0 +1,47 @@
+# Default LeRobot Training Configuration
+# Use this as a starting point for new training jobs
+
+# Policy Configuration
+policy:
+  pretrained_path: "lerobot/smolvla_base"
+  type: "smolvla"
+  load_vlm_weights: true
+  device: "cuda"
+
+# Dataset Configuration
+dataset:
+  repo_id: "hezhenhao/merged_two_data_github"
+  # For local dataset, use: "/path/to/dataset"
+
+# Output Configuration
+output:
+  dir: "outputs/mylerobot_train/0106_smolvla_000"
+  job_name: "train_lekiwi"
+
+# Training Hyperparameters
+training:
+  batch_size: 32  # Adjust based on GPU memory
+  steps: 200000
+  save_freq: 10000
+  eval_freq: -1  # -1 to disable evaluation
+  num_workers: 16
+
+# Logging Configuration
+logging:
+  wandb_enable: false
+
+# Hub Configuration
+hub:
+  policy_repo_id: "hezhenhao/my_policy"
+  push_to_hub: false
+
+# Advanced Options
+advanced:
+  train_expert_only: false
+
+# GPU Recommendations (for reference)
+# RTX 3090 (24GB): batch_size 20-32
+# RTX 4090 (24GB): batch_size 24-32
+# A100 (40GB): batch_size 32-48
+# RTX 3080 (10GB): batch_size 8-12
+# RTX 2080 Ti (11GB): batch_size 8-12

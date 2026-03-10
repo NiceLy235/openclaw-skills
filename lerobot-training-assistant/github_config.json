@@ -1,0 +1,12 @@
+{
+  "github": {
+    "repo": "NiceLy235/training-memories",
+    "token": "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",
+    "branch": "main"
+  },
+  "memory": {
+    "memory_dir": "~/.lerobot_training_memory",
+    "auto_upload": true,
+    "auto_upload_interval_hours": 6
+  }
+}
