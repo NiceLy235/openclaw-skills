@@ -47,9 +47,9 @@ clone_or_use_repo() {
     # Default repository path
     local default_repo_path="$HOME/lerobot_ros2"
     
-    # Step 1: Check if ~/lerobot_ros2 exists and is valid
+    # Step 1: Check if ~/lerobot_ros2 exists and is valid (highest priority)
     if [ -d "$default_repo_path" ]; then
-        # Check if it's a valid lerobot repo
+        # Check if it's a valid lerobot repo (has pyproject.toml or setup.py)
         if [ -f "$default_repo_path/pyproject.toml" ] || [ -f "$default_repo_path/setup.py" ]; then
             log SUCCESS "Found existing lerobot_ros2 repository: $default_repo_path"
             log INFO "Skipping clone, using existing repository"
@@ -57,7 +57,7 @@ clone_or_use_repo() {
             return 0
         else
             log WARNING "Directory $default_repo_path exists but is not a valid lerobot repository"
-            log INFO "Will clone to a different location"
+            log WARNING "Will need to clone to a different location or remove invalid directory"
         fi
     fi
     
