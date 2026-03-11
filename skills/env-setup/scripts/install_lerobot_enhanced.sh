@@ -23,7 +23,8 @@ INSTALL_PATH="${INSTALL_PATH:-$HOME/opt/lerobot}"
 REPO_PATH="${REPO_PATH:-}"
 
 # Repository URL (can be overridden for forks)
-REPO_URL="${REPO_URL:-https://github.com/huggingface/lerobot.git}"
+# Default: openEuler lerobot_ros2 repository (contains lerobot as subdirectory)
+REPO_URL="${REPO_URL:-https://gitcode.com/openeuler/lerobot_ros2}"
 
 # ============================================================
 # Repository Configuration
@@ -371,10 +372,19 @@ install_lerobot_with_deps() {
     
     # Install LeRobot in editable mode from local repository
     echo ""
-    log STEP "Installing LeRobot (editable mode from $repo_path)..."
+    log STEP "Installing LeRobot (editable mode from $repo_path/lerobot)..."
     log INFO "This allows using scripts from the workspace directory"
     
-    cd "$repo_path"
+    # The lerobot_ros2 repo has lerobot as a subdirectory
+    local lerobot_subdir="$repo_path/lerobot"
+    
+    if [ ! -d "$lerobot_subdir" ]; then
+        log ERROR "lerobot subdirectory not found at $lerobot_subdir"
+        log INFO "Expected repository structure: lerobot_ros2/lerobot/"
+        return 1
+    fi
+    
+    cd "$lerobot_subdir"
     
     if pip install -e . 2>&1 | while read line; do
         if echo "$line" | grep -qE "(Collecting|Downloading|Installing|Successfully|Building)"; then
@@ -382,7 +392,7 @@ install_lerobot_with_deps() {
         fi
     done; then
         log SUCCESS "LeRobot installed (editable mode)"
-        log INFO "Workspace: $repo_path"
+        log INFO "Workspace: $lerobot_subdir"
     else
         log ERROR "Failed to install lerobot"
         return 1
