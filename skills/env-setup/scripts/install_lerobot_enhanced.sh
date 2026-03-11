@@ -44,9 +44,25 @@ clone_or_use_repo() {
         fi
     fi
     
-    # Try common locations
+    # Default repository path
+    local default_repo_path="$HOME/lerobot_ros2"
+    
+    # Step 1: Check if ~/lerobot_ros2 exists and is valid
+    if [ -d "$default_repo_path" ]; then
+        # Check if it's a valid lerobot repo
+        if [ -f "$default_repo_path/pyproject.toml" ] || [ -f "$default_repo_path/setup.py" ]; then
+            log SUCCESS "Found existing lerobot_ros2 repository: $default_repo_path"
+            log INFO "Skipping clone, using existing repository"
+            echo "$default_repo_path"
+            return 0
+        else
+            log WARNING "Directory $default_repo_path exists but is not a valid lerobot repository"
+            log INFO "Will clone to a different location"
+        fi
+    fi
+    
+    # Step 2: Try other common locations as fallback
     local possible_paths=(
-        "$HOME/lerobot_ros2"
         "$HOME/lerobot"
         "/home/nice/data/lerobot_ros2"
         "/home/nice/data/lerobot"
@@ -65,35 +81,29 @@ clone_or_use_repo() {
         fi
     done
     
-    # No existing repo found, clone to default location
-    local clone_path="${REPO_PATH:-$HOME/lerobot_ros2}"
-    
-    log INFO "No existing repository found. Cloning to: $clone_path"
-    
-    if [ -d "$clone_path" ]; then
-        log WARNING "Directory $clone_path already exists but is not a valid lerobot repo"
-        read -p "Do you want to remove it and clone fresh? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf "$clone_path"
-        else
-            log ERROR "Cannot clone to $clone_path. Please specify a different REPO_PATH."
-            return 1
-        fi
-    fi
+    # Step 3: No existing repo found, clone to default location
+    log INFO "No existing repository found. Cloning to: $default_repo_path"
     
     log STEP "Cloning from $REPO_URL..."
     
-    if git clone "$REPO_URL" "$clone_path" 2>&1 | while read line; do
+    # Configure proxy for git if available
+    if ss -tlnp 2>/dev/null | grep -q ":10809"; then
+        log INFO "Configuring git to use proxy..."
+        git config --global http.proxy http://127.0.0.1:10809
+        git config --global https.proxy http://127.0.0.1:10809
+    fi
+    
+    if git clone "$REPO_URL" "$default_repo_path" 2>&1 | while read line; do
         if echo "$line" | grep -qE "(Cloning|Receiving|Resolving)"; then
             log PROGRESS "$line"
         fi
     done; then
-        log SUCCESS "Repository cloned to: $clone_path"
-        echo "$clone_path"
+        log SUCCESS "Repository cloned to: $default_repo_path"
+        echo "$default_repo_path"
         return 0
     else
         log ERROR "Failed to clone repository"
+        log INFO "Please check your network connection or proxy settings"
         return 1
     fi
 }
