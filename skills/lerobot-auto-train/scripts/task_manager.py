@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Task manager for background training jobs.
+Task manager for lerobot training jobs.
 
-Provides:
-- Task submission and queue management
+Supports:
+- Submit training tasks with dataset configuration
 - Background execution with progress monitoring
-- Task persistence and recovery
-- Status queries and control
+- Integration with lerobot_train and lerobot_edit_dataset
+- Proxy and HuggingFace token configuration
 """
 
 import argparse
@@ -20,7 +20,6 @@ from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-import threading
 import time
 
 
@@ -31,7 +30,6 @@ class TaskStatus(Enum):
     INITIALIZING = "initializing"
     TRAINING = "training"
     VALIDATING = "validating"
-    EXPORTING = "exporting"
     COMPLETED = "completed"
     FAILED = "failed"
     STOPPED = "stopped"
@@ -41,25 +39,43 @@ class TaskStatus(Enum):
 class TaskManager:
     """Manage training task lifecycle."""
 
-    def __init__(self, tasks_dir: Optional[str] = None):
+    def __init__(self, tasks_dir: Optional[str] = None, lerobot_dir: Optional[str] = None):
         self.tasks_dir = Path(tasks_dir or os.path.expanduser("~/.openclaw/tasks"))
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Find lerobot_ros2 directory
+        self.lerobot_dir = Path(lerobot_dir or "/home/nice/ly/lerobot_ros2")
+        if not self.lerobot_dir.exists():
+            # Try to find it
+            possible_paths = [
+                Path.home() / "lerobot_ros2",
+                Path("/home/nice/ly/lerobot_ros2"),
+            ]
+            for p in possible_paths:
+                if p.exists():
+                    self.lerobot_dir = p
+                    break
+        
         self.active_processes: Dict[str, subprocess.Popen] = {}
 
     def submit_task(
         self,
-        task_type: str,
-        data_sources: List[str],
-        model_name: str,
+        dataset_repo_id: str,
+        model_name: str = "smolvla_base",
         output_dir: str = "./output",
-        epochs: int = 100,
+        policy_type: str = "smolvla",
         batch_size: int = 32,
-        learning_rate: float = 0.001,
+        steps: int = 100000,
+        save_freq: int = 5000,
+        eval_freq: int = 1000,
+        num_workers: int = 16,
         device: str = "cuda",
         background: bool = True,
-        progress_interval: int = 60,
         priority: int = 5,
-        notify_on_complete: bool = False,
+        proxy: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        conda_env: str = "ly_robot",
+        job_name: Optional[str] = None,
         **kwargs
     ) -> Dict:
         """
@@ -71,41 +87,46 @@ class TaskManager:
         # Generate unique task ID
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         task_id = f"train_{timestamp}_{uuid.uuid4().hex[:8]}"
+        
+        if not job_name:
+            job_name = f"train_{model_name}_{timestamp}"
 
         # Create task metadata
         task_meta = {
             "task_id": task_id,
-            "task_type": task_type,
             "status": TaskStatus.PENDING.value,
             "priority": priority,
             "config": {
-                "data_sources": data_sources,
+                "dataset_repo_id": dataset_repo_id,
                 "model_name": model_name,
+                "policy_type": policy_type,
                 "output_dir": output_dir,
-                "epochs": epochs,
                 "batch_size": batch_size,
-                "learning_rate": learning_rate,
+                "steps": steps,
+                "save_freq": save_freq,
+                "eval_freq": eval_freq,
+                "num_workers": num_workers,
                 "device": device,
+                "job_name": job_name,
                 **kwargs
             },
-            "execution": {
-                "background": background,
-                "progress_interval": progress_interval,
-                "notify_on_complete": notify_on_complete
+            "environment": {
+                "conda_env": conda_env,
+                "proxy": proxy,
+                "hf_token": "***" if hf_token else None,
+                "lerobot_dir": str(self.lerobot_dir)
             },
             "progress": {
-                "current_epoch": 0,
-                "total_epochs": epochs,
-                "train_loss": None,
-                "val_loss": None,
-                "best_val_loss": None,
+                "current_step": 0,
+                "total_steps": steps,
+                "loss": None,
+                "lr": None,
                 "elapsed_time": "0m",
                 "estimated_remaining": "calculating..."
             },
             "resource": {
                 "gpu_utilization": "N/A",
-                "gpu_memory_used": "N/A",
-                "cpu_usage": "N/A"
+                "gpu_memory_used": "N/A"
             },
             "timestamps": {
                 "submitted": datetime.now().isoformat(),
@@ -128,50 +149,146 @@ class TaskManager:
 
         # Start execution
         if background:
-            self._start_background_task(task_id, task_meta)
+            self._start_background_task(task_id, task_meta, proxy, hf_token, conda_env)
         else:
             self._start_sync_task(task_id, task_meta)
 
         return task_meta
 
-    def _start_background_task(self, task_id: str, task_meta: Dict) -> None:
+    def _start_background_task(
+        self, 
+        task_id: str, 
+        task_meta: Dict,
+        proxy: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        conda_env: str = "ly_robot"
+    ) -> None:
         """Start task in background process."""
         # Create log file
         log_file = self.tasks_dir / task_id / f"training_{task_id}.log"
         task_meta["log_file"] = str(log_file)
+        
+        # Build training command
+        cmd = self._build_train_command(task_meta, proxy, hf_token, conda_env)
+        
+        # Write wrapper script
+        script_file = self.tasks_dir / task_id / "run_training.sh"
+        with open(script_file, 'w') as f:
+            f.write("#!/bin/bash\n")
+            f.write("# Auto-generated training script\n\n")
+            
+            # Conda activation
+            f.write("source ~/miniconda3/etc/profile.d/conda.sh\n")
+            f.write(f"conda activate {conda_env}\n\n")
+            
+            # Proxy configuration
+            if proxy:
+                f.write(f"export HTTP_PROXY={proxy}\n")
+                f.write(f"export HTTPS_PROXY={proxy}\n\n")
+            
+            # HuggingFace token
+            if hf_token:
+                f.write(f"export HF_TOKEN={hf_token}\n")
+                f.write(f"echo '{hf_token}' > ~/.huggingface/token\n\n")
+            
+            # Working directory
+            f.write(f"cd {self.lerobot_dir}\n\n")
+            
+            # Training command
+            f.write(cmd + "\n")
+        
+        os.chmod(script_file, 0o755)
 
-        # Launch worker process
-        cmd = [
-            sys.executable,
-            str(Path(__file__).parent / "train_worker.py"),
-            "--task-id", task_id,
-            "--tasks-dir", str(self.tasks_dir)
-        ]
-
+        # Launch process
         with open(log_file, 'w') as log:
             process = subprocess.Popen(
-                cmd,
+                ["bash", str(script_file)],
                 stdout=log,
                 stderr=subprocess.STDOUT,
-                start_new_session=True  # Detach from parent
+                start_new_session=True
             )
 
         # Update metadata with PID
         task_meta["pid"] = process.pid
+        task_meta["status"] = TaskStatus.TRAINING.value
+        task_meta["timestamps"]["started"] = datetime.now().isoformat()
         self._update_task_meta(task_id, task_meta)
 
         self.active_processes[task_id] = process
 
-        print(f"🚀 Background task started (PID: {process.pid})")
-        print(f"📊 Monitor with: python task_manager.py --status {task_id}")
+        print(f"🚀 Training started (PID: {process.pid})")
+        print(f"📊 Monitor: python task_manager.py status {task_id}")
+        print(f"📄 Log: {log_file}")
+
+    def _build_train_command(
+        self, 
+        task_meta: Dict,
+        proxy: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        conda_env: str = "ly_robot"
+    ) -> str:
+        """Build lerobot_train command."""
+        config = task_meta["config"]
+        
+        cmd_parts = ["python -m lerobot.scripts.lerobot_train"]
+        
+        # Policy configuration
+        policy_type = config.get("policy_type", "smolvla")
+        cmd_parts.append(f"--policy.type {policy_type}")
+        
+        if policy_type == "smolvla":
+            cmd_parts.append("--policy.pretrained_path lerobot/smolvla_base")
+            cmd_parts.append("--policy.load_vlm_weights true")
+        
+        cmd_parts.append(f"--policy.device {config.get('device', 'cuda')}")
+        cmd_parts.append(f"--policy.repo_id ly/{config['model_name']}_policy")
+        cmd_parts.append("--policy.push_to_hub false")
+        
+        # Dataset configuration
+        cmd_parts.append(f"--dataset.repo_id {config['dataset_repo_id']}")
+        
+        # Training configuration
+        cmd_parts.append(f"--output_dir {config['output_dir']}")
+        cmd_parts.append(f"--job_name {config.get('job_name', 'train')}")
+        cmd_parts.append(f"--batch_size {config['batch_size']}")
+        cmd_parts.append(f"--steps {config['steps']}")
+        cmd_parts.append(f"--save_freq {config['save_freq']}")
+        cmd_parts.append(f"--eval_freq {config['eval_freq']}")
+        cmd_parts.append(f"--num_workers {config['num_workers']}")
+        
+        # Disable wandb by default
+        cmd_parts.append("--wandb.enable false")
+        
+        return " \\\n  ".join(cmd_parts)
 
     def _start_sync_task(self, task_id: str, task_meta: Dict) -> None:
         """Start task synchronously (blocks until complete)."""
-        # For sync tasks, just run the worker directly
-        from train_worker import TrainingWorker
-
-        worker = TrainingWorker(task_id, self.tasks_dir)
-        worker.run()
+        # Run the training directly
+        cmd = self._build_train_command(task_meta)
+        
+        task_meta["status"] = TaskStatus.TRAINING.value
+        task_meta["timestamps"]["started"] = datetime.now().isoformat()
+        self._update_task_meta(task_id, task_meta)
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                cwd=str(self.lerobot_dir),
+                text=True
+            )
+            
+            if result.returncode == 0:
+                task_meta["status"] = TaskStatus.COMPLETED.value
+            else:
+                task_meta["status"] = TaskStatus.FAILED.value
+                
+        except Exception as e:
+            task_meta["status"] = TaskStatus.FAILED.value
+            print(f"❌ Training failed: {e}")
+        
+        task_meta["timestamps"]["completed"] = datetime.now().isoformat()
+        self._update_task_meta(task_id, task_meta)
 
     def get_task_status(self, task_id: str) -> Optional[Dict]:
         """Get current task status and progress."""
@@ -181,7 +298,37 @@ class TaskManager:
             return None
 
         with open(task_file, 'r') as f:
-            return json.load(f)
+            meta = json.load(f)
+        
+        # Try to parse progress from log
+        log_file = self.tasks_dir / task_id / f"training_{task_id}.log"
+        if log_file.exists():
+            self._parse_log_progress(meta, log_file)
+        
+        return meta
+    
+    def _parse_log_progress(self, meta: Dict, log_file: Path) -> None:
+        """Parse training progress from log file."""
+        try:
+            with open(log_file, 'r') as f:
+                # Read last 100 lines
+                lines = f.readlines()[-100:]
+                
+                for line in reversed(lines):
+                    # Parse step/loss/lr from lerobot output
+                    # Format: INFO ... step:200 smpl:6K ep:8 epch:0.65 loss:0.068 grdn:0.749 lr:1.0e-05
+                    if "step:" in line:
+                        parts = line.split()
+                        for part in parts:
+                            if part.startswith("step:"):
+                                meta["progress"]["current_step"] = int(part.split(":")[1])
+                            elif part.startswith("loss:"):
+                                meta["progress"]["loss"] = float(part.split(":")[1])
+                            elif part.startswith("lr:"):
+                                meta["progress"]["lr"] = part.split(":")[1]
+                        break
+        except Exception:
+            pass
 
     def list_tasks(self, status_filter: Optional[str] = None) -> List[Dict]:
         """List all tasks, optionally filtered by status."""
@@ -201,8 +348,8 @@ class TaskManager:
             if status_filter is None or task_meta["status"] == status_filter:
                 tasks.append(task_meta)
 
-        # Sort by priority (higher first) then by submission time
-        tasks.sort(key=lambda t: (-t["priority"], t["timestamps"]["submitted"]))
+        # Sort by submission time
+        tasks.sort(key=lambda t: t["timestamps"]["submitted"], reverse=True)
 
         return tasks
 
@@ -213,14 +360,14 @@ class TaskManager:
             print(f"❌ Task not found: {task_id}")
             return False
 
-        if task_meta["status"] not in ["pending", "preparing_data", "training"]:
+        if task_meta["status"] not in ["pending", "training"]:
             print(f"❌ Cannot stop task in status: {task_meta['status']}")
             return False
 
         # Kill process if running
-        if task_meta["pid"]:
+        if task_meta.get("pid"):
             try:
-                os.kill(task_meta["pid"], signal.SIGTERM)
+                os.killpg(os.getpgid(task_meta["pid"]), signal.SIGTERM)
                 print(f"✅ Sent stop signal to task {task_id} (PID: {task_meta['pid']})")
             except ProcessLookupError:
                 print(f"⚠️  Process already terminated")
@@ -232,36 +379,16 @@ class TaskManager:
 
         return True
 
-    def resume_task(self, task_id: str) -> bool:
-        """Resume a paused/stopped task from checkpoint."""
-        task_meta = self.get_task_status(task_id)
-        if not task_meta:
-            print(f"❌ Task not found: {task_id}")
-            return False
-
-        if task_meta["status"] not in ["paused", "stopped"]:
-            print(f"❌ Can only resume paused or stopped tasks")
-            return False
-
-        # Restart task
-        task_meta["status"] = TaskStatus.PENDING.value
-        self._update_task_meta(task_id, task_meta)
-
-        self._start_background_task(task_id, task_meta)
-
-        return True
-
     def get_task_logs(self, task_id: str, lines: int = 50) -> Optional[str]:
         """Get recent task logs."""
         task_meta = self.get_task_status(task_id)
-        if not task_meta or not task_meta.get("log_file"):
+        if not task_meta:
             return None
-
-        log_file = Path(task_meta["log_file"])
+        
+        log_file = self.tasks_dir / task_id / f"training_{task_id}.log"
         if not log_file.exists():
             return None
 
-        # Read last N lines
         with open(log_file, 'r') as f:
             all_lines = f.readlines()
             return ''.join(all_lines[-lines:])
@@ -276,45 +403,45 @@ class TaskManager:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Manage training tasks"
+        description="Manage lerobot training tasks"
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    subparsers = parser.add_subparsers(dest="command", help="Command")
 
     # Submit command
-    submit_parser = subparsers.add_parser("submit", help="Submit a new training task")
-    submit_parser.add_argument("--task-type", required=True, choices=["bc", "rl"])
-    submit_parser.add_argument("--data-sources", required=True, nargs="+")
-    submit_parser.add_argument("--model-name", required=True)
-    submit_parser.add_argument("--output-dir", default="./output")
-    submit_parser.add_argument("--epochs", type=int, default=100)
+    submit_parser = subparsers.add_parser("submit", help="Submit training task")
+    submit_parser.add_argument("--dataset-repo-id", required=True, help="Dataset repo ID (e.g., ly/train_merged)")
+    submit_parser.add_argument("--model-name", default="smolvla_base")
+    submit_parser.add_argument("--policy-type", default="smolvla", choices=["smolvla", "act"])
+    submit_parser.add_argument("--output-dir", default="outputs/mylerobot_train")
     submit_parser.add_argument("--batch-size", type=int, default=32)
-    submit_parser.add_argument("--learning-rate", type=float, default=0.001)
+    submit_parser.add_argument("--steps", type=int, default=100000)
+    submit_parser.add_argument("--save-freq", type=int, default=5000)
+    submit_parser.add_argument("--eval-freq", type=int, default=1000)
+    submit_parser.add_argument("--num-workers", type=int, default=16)
     submit_parser.add_argument("--device", default="cuda")
-    submit_parser.add_argument("--background", action="store_true", default=True)
-    submit_parser.add_argument("--progress-interval", type=int, default=60)
+    submit_parser.add_argument("--job-name")
+    submit_parser.add_argument("--proxy", help="Proxy URL (e.g., http://127.0.0.1:10809)")
+    submit_parser.add_argument("--hf-token", help="HuggingFace token")
+    submit_parser.add_argument("--conda-env", default="ly_robot")
     submit_parser.add_argument("--priority", type=int, default=5)
-    submit_parser.add_argument("--notify-on-complete", action="store_true")
+    submit_parser.add_argument("--background", action="store_true", default=True)
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Check task status")
-    status_parser.add_argument("task_id", help="Task ID to check")
+    status_parser.add_argument("task_id")
 
     # List command
-    list_parser = subparsers.add_parser("list", help="List all tasks")
-    list_parser.add_argument("--status", help="Filter by status")
+    list_parser = subparsers.add_parser("list", help="List tasks")
+    list_parser.add_argument("--status")
 
     # Stop command
-    stop_parser = subparsers.add_parser("stop", help="Stop a task")
-    stop_parser.add_argument("task_id", help="Task ID to stop")
-
-    # Resume command
-    resume_parser = subparsers.add_parser("resume", help="Resume a task")
-    resume_parser.add_argument("task_id", help="Task ID to resume")
+    stop_parser = subparsers.add_parser("stop", help="Stop task")
+    stop_parser.add_argument("task_id")
 
     # Logs command
-    logs_parser = subparsers.add_parser("logs", help="View task logs")
-    logs_parser.add_argument("task_id", help="Task ID")
+    logs_parser = subparsers.add_parser("logs", help="View logs")
+    logs_parser.add_argument("task_id")
     logs_parser.add_argument("--lines", type=int, default=50)
 
     args = parser.parse_args()
@@ -323,18 +450,22 @@ def main():
 
     if args.command == "submit":
         meta = manager.submit_task(
-            task_type=args.task_type,
-            data_sources=args.data_sources,
+            dataset_repo_id=args.dataset_repo_id,
             model_name=args.model_name,
+            policy_type=args.policy_type,
             output_dir=args.output_dir,
-            epochs=args.epochs,
             batch_size=args.batch_size,
-            learning_rate=args.learning_rate,
+            steps=args.steps,
+            save_freq=args.save_freq,
+            eval_freq=args.eval_freq,
+            num_workers=args.num_workers,
             device=args.device,
-            background=args.background,
-            progress_interval=args.progress_interval,
+            job_name=args.job_name,
+            proxy=args.proxy,
+            hf_token=args.hf_token,
+            conda_env=args.conda_env,
             priority=args.priority,
-            notify_on_complete=args.notify_on_complete
+            background=args.background
         )
         print(json.dumps(meta, indent=2))
 
@@ -349,20 +480,21 @@ def main():
         tasks = manager.list_tasks(args.status)
         print(f"Found {len(tasks)} tasks")
         for task in tasks:
-            print(f"  - {task['task_id']}: {task['status']} (priority {task['priority']})")
+            progress = task.get("progress", {})
+            step = progress.get("current_step", 0)
+            total = progress.get("total_steps", "?")
+            loss = progress.get("loss", "?")
+            print(f"  - {task['task_id']}: {task['status']} (step {step}/{total}, loss={loss})")
 
     elif args.command == "stop":
         manager.stop_task(args.task_id)
-
-    elif args.command == "resume":
-        manager.resume_task(args.task_id)
 
     elif args.command == "logs":
         logs = manager.get_task_logs(args.task_id, args.lines)
         if logs:
             print(logs)
         else:
-            print(f"❌ No logs available for task: {args.task_id}")
+            print(f"❌ No logs for task: {args.task_id}")
 
     else:
         parser.print_help()
