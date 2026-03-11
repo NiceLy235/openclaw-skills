@@ -150,11 +150,32 @@ Status: ⏳ running
 |-----------|------|----------|---------|-------------|
 | env_type | string | Yes | - | Environment type: `v2ray` or `lerobot` |
 | INSTALL_PATH | string | No | `~/opt/<env>` | Installation directory (set as environment variable) |
+| REPO_PATH | string | No | Auto-detect | LeRobot repository path (for editable install) |
+| REPO_URL | string | No | huggingface/lerobot | Git repository URL for cloning |
 
-Example with custom path:
+Example with custom paths:
 ```bash
+# Install v2ray with custom path
 INSTALL_PATH=~/custom/path bash scripts/install_v2ray.sh
+
+# Install lerobot with existing repository
+REPO_PATH=/home/nice/data/lerobot_ros2 bash scripts/install_lerobot_enhanced.sh
+
+# Install lerobot with custom clone URL (for forks)
+REPO_URL=https://github.com/yourfork/lerobot.git bash scripts/install_lerobot_enhanced.sh
 ```
+
+### Repository Configuration (LeRobot)
+
+LeRobot is installed in **editable mode** (`pip install -e .`) to allow:
+- ✅ Using scripts from the workspace directory
+- ✅ Modifying source code without reinstalling
+- ✅ Running `python -m lerobot.scripts.*` commands
+
+**Auto-Detection Order:**
+1. `REPO_PATH` environment variable (if set)
+2. Existing directories: `~/lerobot_ros2`, `~/lerobot`, `/home/nice/data/lerobot_ros2`, etc.
+3. Clone to `~/lerobot_ros2` if no existing repo found
 
 ## Output
 
@@ -243,19 +264,32 @@ source ~/.bashrc
 **After Installation:**
 
 ```bash
-# Activate environment (with auto proxy configuration)
+# Activate environment (with auto workspace configuration)
 source ~/opt/lerobot/activate.sh
 
-# Or manually
-source ~/opt/lerobot/venv/bin/activate
+# This will:
+# 1. Activate virtual environment
+# 2. Configure V2Ray proxy (if running)
+# 3. Change to workspace directory
+# 4. Set LEROBOT_WORKSPACE environment variable
 
 # Verify installation
 python3 -c "import lerobot; print(lerobot.__version__)"
 python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
 
+# Use workspace scripts
+python -m lerobot.scripts.lerobot_train --help
+python -m lerobot.scripts.lerobot_record --help
+python -m lerobot.scripts.lerobot_replay --help
+
 # Check for dependency issues
 python3 ~/.openclaw/workspace/skills/env-setup/scripts/resolve_dependencies.py --check
 ```
+
+**Editable Install Benefits:**
+- ✅ Use `python -m lerobot.scripts.*` to run workspace scripts
+- ✅ Modify source code and changes take effect immediately
+- ✅ Full access to all lerobot tools and utilities
 
 **GPU Support:**
 - Automatically detects and configures CUDA if available

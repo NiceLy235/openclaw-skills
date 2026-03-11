@@ -7,6 +7,8 @@
 # - Configure proxy for HuggingFace access
 # - Install all required dependencies including num2words
 # - Verify and fix version mismatches
+# - Support editable install from local repository (pip install -e .)
+# - Auto-configure workspace directory for script access
 
 set -e
 
@@ -15,6 +17,86 @@ source "$SCRIPT_DIR/common_utils.sh"
 
 # Default installation path
 INSTALL_PATH="${INSTALL_PATH:-$HOME/opt/lerobot}"
+
+# Repository path (for editable install)
+# If not set, will clone to ~/lerobot_ros2 or use existing
+REPO_PATH="${REPO_PATH:-}"
+
+# Repository URL (can be overridden for forks)
+REPO_URL="${REPO_URL:-https://github.com/huggingface/lerobot.git}"
+
+# ============================================================
+# Repository Configuration
+# ============================================================
+
+clone_or_use_repo() {
+    log INFO "Configuring LeRobot repository..."
+    
+    # If REPO_PATH is set, use it directly
+    if [ -n "$REPO_PATH" ]; then
+        if [ -d "$REPO_PATH" ]; then
+            log SUCCESS "Using existing repository: $REPO_PATH"
+            echo "$REPO_PATH"
+            return 0
+        else
+            log ERROR "Repository path specified but not found: $REPO_PATH"
+            return 1
+        fi
+    fi
+    
+    # Try common locations
+    local possible_paths=(
+        "$HOME/lerobot_ros2"
+        "$HOME/lerobot"
+        "/home/nice/data/lerobot_ros2"
+        "/home/nice/data/lerobot"
+        "$HOME/workspace/lerobot"
+        "$HOME/work/lerobot"
+    )
+    
+    for path in "${possible_paths[@]}"; do
+        if [ -d "$path" ]; then
+            # Check if it's a valid lerobot repo
+            if [ -f "$path/pyproject.toml" ] || [ -f "$path/setup.py" ]; then
+                log SUCCESS "Found existing repository: $path"
+                echo "$path"
+                return 0
+            fi
+        fi
+    done
+    
+    # No existing repo found, clone to default location
+    local clone_path="${REPO_PATH:-$HOME/lerobot_ros2}"
+    
+    log INFO "No existing repository found. Cloning to: $clone_path"
+    
+    if [ -d "$clone_path" ]; then
+        log WARNING "Directory $clone_path already exists but is not a valid lerobot repo"
+        read -p "Do you want to remove it and clone fresh? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$clone_path"
+        else
+            log ERROR "Cannot clone to $clone_path. Please specify a different REPO_PATH."
+            return 1
+        fi
+    fi
+    
+    log STEP "Cloning from $REPO_URL..."
+    
+    if git clone "$REPO_URL" "$clone_path" 2>&1 | while read line; do
+        if echo "$line" | grep -qE "(Cloning|Receiving|Resolving)"; then
+            log PROGRESS "$line"
+        fi
+    done; then
+        log SUCCESS "Repository cloned to: $clone_path"
+        echo "$clone_path"
+        return 0
+    else
+        log ERROR "Failed to clone repository"
+        return 1
+    fi
+}
 
 # ============================================================
 # Cuda Version Detection
@@ -256,28 +338,41 @@ install_lerobot_with_deps() {
     local venv_path="$INSTALL_PATH/venv"
     source "$venv_path/bin/activate"
     
+    # Configure repository (clone or use existing)
+    local repo_path
+    repo_path=$(clone_or_use_repo) || {
+        log ERROR "Failed to configure repository"
+        return 1
+    }
+    
+    # Store repo path for activation script
+    export LEROBOT_REPO_PATH="$repo_path"
+    
     # Install specific versions of conflicting packages first
     log STEP "Installing dependency packages with compatible versions..."
     
-    # These versions are known to work with lerobot 0.4.4
     pip install -q \
-        "huggingface-hub>=0.34.2,<0.36.0" \
-        "packaging>=24.2,<26.0" \
-        "protobuf>=3.19.0,<7" \
+        "huggingface-hub>=0.34.2" \
+        "packaging>=24.2" \
+        "protobuf>=3.19.0" \
         || {
         log WARNING "Some version-constrained packages failed, will try default versions"
     }
     
-    # Install LeRobot
+    # Install LeRobot in editable mode from local repository
     echo ""
-    log STEP "Installing LeRobot..."
+    log STEP "Installing LeRobot (editable mode from $repo_path)..."
+    log INFO "This allows using scripts from the workspace directory"
     
-    if pip install lerobot==0.4.4 2>&1 | while read line; do
-        if echo "$line" | grep -qE "(Collecting|Downloading|Installing|Successfully)"; then
+    cd "$repo_path"
+    
+    if pip install -e . 2>&1 | while read line; do
+        if echo "$line" | grep -qE "(Collecting|Downloading|Installing|Successfully|Building)"; then
             log PROGRESS "$(echo "$line" | cut -c1-80)"
         fi
     done; then
-        log SUCCESS "LeRobot installed"
+        log SUCCESS "LeRobot installed (editable mode)"
+        log INFO "Workspace: $repo_path"
     else
         log ERROR "Failed to install lerobot"
         return 1
@@ -409,20 +504,29 @@ create_activation_script() {
     log INFO "Creating activation script..."
     
     local activate_script="$INSTALL_PATH/activate.sh"
+    local repo_path="${LEROBOT_REPO_PATH:-}"
     
-    cat > "$activate_script" << 'EOF'
+    # If repo_path is not set, try to detect it
+    if [ -z "$repo_path" ]; then
+        repo_path=$(clone_or_use_repo) || {
+            log WARNING "Could not detect repository path, activation script won't include workspace"
+            repo_path=""
+        }
+    fi
+    
+    cat > "$activate_script" << ACTIVATE_EOF
 #!/bin/bash
-# LeRobot activation script with proxy support
+# LeRobot activation script with workspace configuration
 
-VENV_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/venv"
+VENV_PATH="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)/venv"
+WORKSPACE_PATH="$repo_path"
 
-if [ ! -d "$VENV_PATH" ]; then
-    echo "Error: Virtual environment not found at $VENV_PATH"
+if [ ! -d "\$VENV_PATH" ]; then
+    echo "Error: Virtual environment not found at \$VENV_PATH"
     exit 1
 fi
 
-# Activate virtual environment
-source "$VENV_PATH/bin/activate"
+source "\$VENV_PATH/bin/activate"
 
 # Configure proxy if V2Ray is running
 if ss -tlnp 2>/dev/null | grep -q ":10809"; then
@@ -432,20 +536,34 @@ if ss -tlnp 2>/dev/null | grep -q ":10809"; then
     echo "✓ V2Ray proxy configured"
 fi
 
-# Show environment info
-echo "LeRobot environment activated!"
+# Set workspace directory and cd to it
+if [ -n "\$WORKSPACE_PATH" ] && [ -d "\$WORKSPACE_PATH" ]; then
+    export LEROBOT_WORKSPACE="\$WORKSPACE_PATH"
+    cd "\$WORKSPACE_PATH"
+fi
+
+echo "✓ LeRobot environment activated!"
 echo ""
+echo "Python:   \$(which python3)"
 python3 << 'PYINFO'
 import torch
 try:
     import lerobot
-    print(f"PyTorch: {torch.__version__}")
-    print(f"CUDA: {torch.cuda.is_available()}")
-    print(f"LeRobot: {lerobot.__version__}")
+    print(f"LeRobot:  {lerobot.__version__}")
 except:
-    pass
+    print("LeRobot:  (import error)")
 PYINFO
-EOF
+echo "PyTorch:  \$(python3 -c 'import torch; print(torch.__version__)')"
+echo "CUDA:     \$(python3 -c 'import torch; print(torch.cuda.is_available())')"
+if [ -n "\$WORKSPACE_PATH" ]; then
+    echo "Workspace: \$WORKSPACE_PATH"
+    echo ""
+    echo "Available scripts:"
+    echo "  python -m lerobot.scripts.lerobot_train --help"
+    echo "  python -m lerobot.scripts.lerobot_record --help"
+    echo "  python -m lerobot.scripts.lerobot_replay --help"
+fi
+ACTIVATE_EOF
     
     chmod +x "$activate_script"
     
