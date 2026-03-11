@@ -1,7 +1,7 @@
 {
   "github": {
     "repo": "NiceLy235/training-memories",
-    "token": "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",
+    "token": "${GITHUB_TOKEN}",
     "branch": "main"
   },
   "memory": {
