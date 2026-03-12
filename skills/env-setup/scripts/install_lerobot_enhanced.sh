@@ -9,6 +9,7 @@
 # - Verify and fix version mismatches
 # - Support editable install from local repository (pip install -e .)
 # - Auto-configure workspace directory for script access
+# - **MANDATORY: Check V2Ray configuration and testing before installation**
 
 set -e
 
@@ -25,6 +26,113 @@ REPO_PATH="${REPO_PATH:-}"
 # Repository URL (can be overridden for forks)
 # Default: openEuler lerobot_ros2 repository (contains lerobot as subdirectory)
 REPO_URL="${REPO_URL:-https://gitcode.com/openeuler/lerobot_ros2}"
+
+# ============================================================
+# V2Ray Pre-requisite Check (MANDATORY)
+# ============================================================
+
+check_v2ray_requirement() {
+    log INFO "========================================="
+    log INFO "V2Ray Pre-requisite Check (MANDATORY)"
+    log INFO "========================================="
+    log INFO ""
+    
+    # Allow bypass if explicitly set
+    if [ "${NO_PROXY_REQUIRED}" = "true" ]; then
+        log WARNING "⚠️ V2Ray requirement disabled (NO_PROXY_REQUIRED=true)"
+        log WARNING "This is NOT recommended for restricted networks"
+        log WARNING "Installation may fail due to network issues"
+        log INFO ""
+        return 0
+    fi
+    
+    # Check if V2Ray config exists
+    local v2ray_config="/usr/local/etc/v2ray/config.json"
+    
+    if [ ! -f "$v2ray_config" ]; then
+        log ERROR "❌ V2Ray configuration not found: $v2ray_config"
+        log ERROR ""
+        log ERROR "⚠️ MANDATORY REQUIREMENT NOT SATISFIED!"
+        log ERROR ""
+        log ERROR "Before installing LeRobot, you MUST:"
+        log ERROR "  1. Install V2Ray:     bash scripts/install_v2ray.sh"
+        log ERROR "  2. Test connectivity: bash scripts/test_proxy.sh"
+        log ERROR "  3. Verify all tests pass"
+        log ERROR ""
+        log ERROR "This requirement ensures:"
+        log ERROR "  ✅ HuggingFace model downloads work"
+        log ERROR "  ✅ PyTorch installation succeeds"
+        log ERROR "  ✅ No network-related failures"
+        log ERROR ""
+        exit 1
+    fi
+    
+    log SUCCESS "✓ V2Ray configuration found"
+    
+    # Check if V2Ray service is running (Linux only)
+    if [ "$(uname)" != "Darwin" ]; then
+        if command -v systemctl &> /dev/null; then
+            if ! systemctl is-active --quiet v2ray 2>/dev/null; then
+                log ERROR "❌ V2Ray service is not running"
+                log ERROR ""
+                log ERROR "Please start V2Ray:"
+                log ERROR "  sudo systemctl start v2ray"
+                log ERROR ""
+                log ERROR "Then test connectivity:"
+                log ERROR "  bash scripts/test_proxy.sh"
+                log ERROR ""
+                exit 1
+            fi
+            log SUCCESS "✓ V2Ray service is running"
+        else
+            # Container environment - check if v2ray process is running
+            if ! pgrep -x "v2ray" > /dev/null; then
+                log WARNING "⚠️ V2Ray process not detected"
+                log WARNING "If in container, start manually:"
+                log WARNING "  nohup /usr/local/bin/v2ray run -c /usr/local/etc/v2ray/config.json &"
+                log WARNING ""
+                log WARNING "Then test connectivity:"
+                log WARNING "  bash scripts/test_proxy.sh"
+            else
+                log SUCCESS "✓ V2Ray process is running"
+            fi
+        fi
+    fi
+    
+    # Check if proxy tests have been run
+    local test_marker="/tmp/v2ray_tests_passed"
+    
+    if [ ! -f "$test_marker" ]; then
+        log ERROR ""
+        log ERROR "========================================="
+        log ERROR "❌ V2RAY CONNECTIVITY NOT TESTED!"
+        log ERROR "========================================="
+        log ERROR ""
+        log ERROR "You have V2Ray installed and running, but haven't tested it."
+        log ERROR ""
+        log ERROR "Please run the mandatory connectivity test:"
+        log ERROR "  bash scripts/test_proxy.sh"
+        log ERROR ""
+        log ERROR "This test verifies:"
+        log ERROR "  ✅ Google access (required for general connectivity)"
+        log ERROR "  ✅ HuggingFace access (required for model downloads)"
+        log ERROR ""
+        log ERROR "After tests pass, installation will continue automatically."
+        log ERROR ""
+        exit 1
+    fi
+    
+    log SUCCESS "✓ V2Ray connectivity tests have passed"
+    log INFO ""
+    log SUCCESS "========================================="
+    log SUCCESS "✅ V2RAY REQUIREMENT SATISFIED"
+    log SUCCESS "========================================="
+    log SUCCESS ""
+    log SUCCESS "Proceeding with LeRobot installation..."
+    log INFO ""
+    
+    return 0
+}
 
 # ============================================================
 # Repository Configuration
@@ -606,6 +714,9 @@ main() {
     log INFO "Enhanced installation with dependency conflict resolution"
     log STEP "Installation log: $log_file"
     echo ""
+    
+    # ⚠️ MANDATORY: Check V2Ray pre-requisite
+    check_v2ray_requirement
     
     # Initialize progress (8 steps)
     init_progress 8

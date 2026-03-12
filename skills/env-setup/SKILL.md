@@ -83,19 +83,107 @@ bash scripts/check_environment.sh v2ray
 bash scripts/check_environment.sh lerobot
 ```
 
+### Test V2Ray Connectivity (MANDATORY!)
+
+**After installing V2Ray, you MUST test it before proceeding:**
+
+```bash
+# Test proxy connectivity to Google and HuggingFace
+bash scripts/test_proxy.sh
+
+# Expected output if successful:
+# ✅ Google:      PASSED
+# ✅ HuggingFace: PASSED
+# ✅ ALL CRITICAL TESTS PASSED!
+
+# If tests fail, check:
+# 1. V2Ray config: /usr/local/etc/v2ray/config.json
+# 2. V2Ray service: systemctl status v2ray
+# 3. Network connectivity
+```
+
+## ⚠️ MANDATORY REQUIREMENT: V2Ray Configuration and Testing
+
+**Before installing ANY other components (Python, PyTorch, LeRobot, etc.), you MUST:**
+
+1. ✅ Install and configure V2Ray
+2. ✅ Start V2Ray service
+3. ✅ Test proxy connectivity (Google + HuggingFace)
+4. ✅ Verify tests pass successfully
+
+**This is NON-NEGOTIABLE. If proxy tests fail, installation will STOP.**
+
+### Why This Requirement?
+
+- LeRobot requires downloading large files from HuggingFace
+- PyTorch installation needs access to download.pytorch.org
+- Without working proxy, installation will fail and waste time
+- **Save time: Fix proxy first, then proceed**
+
+### How to Satisfy This Requirement
+
+```bash
+# Step 1: Install V2Ray
+bash scripts/install_v2ray.sh
+
+# Step 2: Test proxy connectivity (MANDATORY)
+bash scripts/test_proxy.sh
+
+# If tests pass, you'll see:
+# ✅ ALL CRITICAL TESTS PASSED!
+# You can now proceed with other installations.
+
+# Step 3: Only then install other components
+bash scripts/install_lerobot_enhanced.sh
+```
+
+**If you need to bypass this check (not recommended):**
+```bash
+NO_PROXY_REQUIRED=true bash scripts/install_lerobot_enhanced.sh
+```
+
 ## Installation Workflow
 
 Each installation follows these steps with **real-time progress display**:
 
-1. **Network & Proxy Check** (New!)
-   - Detect V2Ray proxy (SOCKS5/HTTP)
-   - Test HuggingFace connectivity
-   - Configure proxy automatically
+### For V2Ray Installation
+
+1. **Environment Check**
+   - Verify OS and architecture
+   - Check system requirements
+
+2. **Install V2Ray Core**
+   - Download from official repository
+   - Install to system path
+
+3. **Configure Proxy**
+   - Create complete config with routing rules
+   - Set up SOCKS5 (10808) and HTTP (10809) proxies
+
+4. **Start Service**
+   - Enable systemd service (Linux) or provide manual start command (macOS)
+   - Verify service is running
+
+5. **Test Connectivity** ⚠️ **MANDATORY**
+   - Test Google access via SOCKS5 proxy
+   - Test HuggingFace access via HTTP proxy
+   - **ALL tests must pass before proceeding**
+
+### For LeRobot Installation
+
+**⚠️ Pre-requisite Check (MANDATORY):**
+- Script will check if V2Ray is configured and tested
+- If not, installation will STOP with error message
+- You must run V2Ray installation and testing first
+
+1. **V2Ray Verification**
+   - Check if V2Ray config exists
+   - Check if proxy tests have passed
+   - Stop if not satisfied
 
 2. **Environment Detection**
    - Check OS version and architecture
    - Verify disk space (minimum 2GB)
-   - Test network connectivity
    - Detect existing installations
 
 3. **CUDA Detection** (Enhanced!)
@@ -227,12 +315,29 @@ v2ray run -c /usr/local/etc/v2ray/config.json
 - Includes complete proxy configuration with routing rules
 - Automatic backup of existing configuration
 
-**Connectivity Test:**
+**Connectivity Test:** ⚠️ **MANDATORY**
 
-The installation automatically tests proxy connectivity:
-- Tests Google access via SOCKS5 proxy
-- Tests GitHub access via HTTP proxy
-- Reports success/failure for troubleshooting
+**You MUST test V2Ray before proceeding with other installations:**
+
+```bash
+# Test proxy connectivity
+bash scripts/test_proxy.sh
+
+# This will test:
+# - Google access (via SOCKS5)
+# - HuggingFace access (via HTTP)
+# - GitHub access (via HTTP)
+
+# If tests pass:
+# ✅ You can proceed with other installations
+# ✅ HuggingFace model downloads will work
+# ✅ PyTorch installation will succeed
+
+# If tests fail:
+# ❌ STOP and fix V2Ray configuration
+# ❌ Do NOT proceed with other installations
+# ❌ Check config file and restart V2Ray
+```
 
 **Using the Proxy:**
 
@@ -261,7 +366,15 @@ source ~/.bashrc
 
 ### LeRobot
 
-**After Installation:**
+**⚠️ PRE-REQUISITE: V2Ray MUST be configured and tested first!**
+
+**Before installing LeRobot:**
+1. ✅ Install V2Ray: `bash scripts/install_v2ray.sh`
+2. ✅ Test proxy: `bash scripts/test_proxy.sh`
+3. ✅ Verify all tests pass
+4. **Only then** install LeRobot
+
+**Installation will STOP if V2Ray tests have not passed.**
 
 ```bash
 # Activate environment (with auto workspace configuration)
