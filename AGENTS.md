@@ -472,6 +472,62 @@ cd ../github-sync/scripts
 
 ---
 
+## 📱 Feishu Operations - Real-Time Feedback
+
+**CRITICAL: All Feishu tasks MUST show real-time progress. NEVER wait until completion to report results.**
+
+### Mandatory Workflow
+
+For ANY multi-step Feishu operation (doc operations, wiki navigation, drive management, bitable operations):
+
+1. **IMMEDIATE START**: Send "🚀 开始执行任务..." BEFORE first API call
+2. **STEP-BY-STEP**: Send progress update after EACH step completion
+3. **COMPLETION**: Send final summary with results
+
+### Standard Message Format
+
+```
+# Start
+🚀 开始执行任务：[任务名称]
+
+# Progress (after each step)
+✅ 步骤 X/Y 完成：[步骤描述]
+
+# Completion
+✅ 全部完成！[结果摘要]
+```
+
+### Example: Create Wiki Page
+
+```
+1️⃣ [Send Message] 🚀 开始创建 Wiki 页面...
+2️⃣ [API Call] feishu_wiki({ "action": "create", ... })
+3️⃣ [Send Message] ✅ 步骤 1/3：已创建 Wiki 节点
+4️⃣ [API Call] feishu_doc({ "action": "write", ... })
+5️⃣ [Send Message] ✅ 步骤 2/3：已写入内容
+6️⃣ [API Call] feishu_doc({ "action": "upload_image", ... })
+7️⃣ [Send Message] ✅ 步骤 3/3：已上传图片
+8️⃣ [Send Message] 🎉 全部完成！Wiki 页面已创建
+```
+
+### Enforcement Rules
+
+- **NEVER** execute >3 Feishu API calls without at least one progress message
+- **ALWAYS** send start message before first API call
+- **ALWAYS** send completion message after last API call
+- **ALWAYS** report errors immediately with recovery attempt
+
+### Why This Matters
+
+- ✅ User knows task is in progress (not stuck)
+- ✅ User can see which step is executing
+- ✅ Better experience for long-running operations
+- ✅ Follows "Long-Running Commands - Real-Time Feedback" principle
+
+**This rule applies to ALL Feishu operations, regardless of which skill is active or whether it's a new session.**
+
+---
+
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
