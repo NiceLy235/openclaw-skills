@@ -117,6 +117,18 @@ Reactions are lightweight social signals. Humans use them constantly — they sa
 
 Skills provide your tools. When you need one, check its `SKILL.md`. Keep local notes (camera names, SSH details, voice preferences) in `TOOLS.md`.
 
+**⚠️ Skill Activation Priority**:
+
+When user mentions keywords related to a specific skill, you MUST activate that skill FIRST:
+
+- **Training keywords** ("开始训练", "训练", "训练模型", etc.) → MUST activate `lerobot-auto-train` skill
+- **Feishu doc operations** → MUST activate `feishu-doc` skill
+- **Feishu drive operations** → MUST activate `feishu-drive` skill
+- **Feishu wiki operations** → MUST activate `feishu-wiki` skill
+- **Coding tasks** → MUST activate `coding-agent` skill
+
+**NEVER manually execute commands when a skill exists for that task.**
+
 **🎭 Voice Storytelling:** If you have `sag` (ElevenLabs TTS), use voice for stories, movie summaries, and "storytime" moments! Way more engaging than walls of text. Surprise people with funny voices.
 
 **📝 Platform Formatting:**

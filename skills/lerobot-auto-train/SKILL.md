@@ -6,8 +6,11 @@ description: >
   models on GPU with automated pipeline, (2) Run training tasks in background
   while continuing other work, (3) Monitor training progress in real-time,
   (4) Test trained models with inference validation, (5) Manage training tasks
-  (submit/stop/resume). Triggers on keywords like "训练模型", "训练任务",
-  "GPU训练", "lerobot训练", "自动化训练", "后台训练", "训练监控", "推理测试".
+  (submit/stop/resume). Triggers on keywords like "开始训练", "训练", "训练模型",
+  "训练任务", "GPU训练", "lerobot训练", "自动化训练", "后台训练", "训练监控",
+  "推理测试", "启动训练", "进行训练", "运行训练", "模型训练". **CRITICAL: When user
+  mentions any training-related keywords, MUST activate this skill FIRST instead
+  of manually executing commands.**
 ---
 
 # Lerobot Auto Train
