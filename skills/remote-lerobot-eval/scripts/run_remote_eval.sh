@@ -1,17 +1,17 @@
 #!/bin/bash
 # Automated Remote Lerobot Evaluation Script
-# Usage: ./run_remote_eval.sh <config_file>
+# Usage: ./run_remote_eval.sh [--interactive]
 
 set -e
 
-# Default configuration
-JUMP_SERVER_IP="${JUMP_SERVER_IP:-192.168.136.128}"
-JUMP_USER="${JUMP_USER:-nice}"
-JUMP_PASS="${JUMP_PASS:-NICE}"
+# Default configuration (will be overridden by user input or config file)
+JUMP_SERVER_IP="${JUMP_SERVER_IP:-}"
+JUMP_USER="${JUMP_USER:-}"
+JUMP_PASS="${JUMP_PASS:-}"
 
-TARGET_IP="${TARGET_IP:-10.10.10.54}"
-TARGET_USER="${TARGET_USER:-root}"
-TARGET_PASS="${TARGET_PASS:-Nice@123}"
+TARGET_IP="${TARGET_IP:-}"
+TARGET_USER="${TARGET_USER:-}"
+TARGET_PASS="${TARGET_PASS:-}"
 
 MODEL_PATH="${MODEL_PATH:-/home/nice/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model}"
 DATASET_ID="${DATASET_ID:-ly/eval_dataset}"
@@ -23,6 +23,7 @@ TMUX_SESSION="${TMUX_SESSION:-lerobot_eval}"
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 log_info() {
@@ -37,6 +38,41 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+log_prompt() {
+    echo -e "${BLUE}[?]${NC} $1"
+}
+
+# Function to get user input
+get_input() {
+    local prompt="$1"
+    local var_name="$2"
+    local default="$3"
+    local is_password="$4"
+    
+    if [ -n "${!var_name}" ]; then
+        log_info "$var_name already set: ${!var_name}"
+        return
+    fi
+    
+    if [ -n "$default" ]; then
+        prompt="$prompt (default: $default)"
+    fi
+    
+    log_prompt "$prompt"
+    read -r value
+    
+    if [ -z "$value" ] && [ -n "$default" ]; then
+        value="$default"
+    fi
+    
+    if [ -z "$value" ]; then
+        log_error "Value is required for $var_name"
+        exit 1
+    fi
+    
+    eval "$var_name='$value'"
+}
+
 # Function to execute command on jump server
 jump_exec() {
     sshpass -p "$JUMP_PASS" ssh -o StrictHostKeyChecking=no "$JUMP_USER@$JUMP_SERVER_IP" "$1"
@@ -45,6 +81,54 @@ jump_exec() {
 # Function to execute command on target machine
 target_exec() {
     jump_exec "sshpass -p '$TARGET_PASS' ssh -o StrictHostKeyChecking=no '$TARGET_USER@$TARGET_IP' \"$1\""
+}
+
+# Step 0: Collect configuration
+collect_config() {
+    log_info "=========================================="
+    log_info "Remote Lerobot Evaluation Configuration"
+    log_info "=========================================="
+    echo ""
+    
+    get_input "Jump server IP address" JUMP_SERVER_IP
+    get_input "Jump server username" JUMP_USER
+    get_input "Jump server password" JUMP_PASS "" "password"
+    
+    echo ""
+    get_input "Target robot IP address" TARGET_IP
+    get_input "Target robot username" TARGET_USER
+    get_input "Target robot password" TARGET_PASS "" "password"
+    
+    echo ""
+    get_input "Pretrained model path" MODEL_PATH "$MODEL_PATH"
+    get_input "Dataset ID" DATASET_ID "$DATASET_ID"
+    
+    echo ""
+    log_prompt "Is robot hardware connected and powered? (yes/no)"
+    read -r hardware_ready
+    
+    if [[ ! "$hardware_ready" =~ ^[Yy][Ee][Ss]$ ]]; then
+        log_error "Please connect and power on robot hardware before continuing."
+        log_info "Run this script again after hardware is ready."
+        exit 1
+    fi
+    
+    log_info "Configuration collected ✓"
+    echo ""
+    log_info "Summary:"
+    echo "  Jump Server: $JUMP_USER@$JUMP_SERVER_IP"
+    echo "  Target Robot: $TARGET_USER@$TARGET_IP"
+    echo "  Model: $MODEL_PATH"
+    echo "  Dataset: $DATASET_ID"
+    echo ""
+    
+    log_prompt "Continue with execution? (yes/no)"
+    read -r confirm
+    
+    if [[ ! "$confirm" =~ ^[Yy][Ee][Ss]$ ]]; then
+        log_info "Execution cancelled."
+        exit 0
+    fi
 }
 
 # Step 1: Check prerequisites

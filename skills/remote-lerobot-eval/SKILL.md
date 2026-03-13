@@ -33,14 +33,31 @@ This skill manages remote evaluation workflows:
 
 ## Quick Start
 
+### ⚠️ CRITICAL: Ask User First
+
+**DO NOT assume any values.** Always ask the user for these required parameters before executing any commands:
+
+**Required questions to ask:**
+1. What is the jump server IP address? (e.g., 192.168.136.128)
+2. What is the jump server username? (e.g., nice)
+3. What is the jump server password? (e.g., NICE)
+4. What is the target robot IP address? (e.g., 10.10.10.54)
+5. What is the target robot username? (e.g., root)
+6. What is the target robot password? (e.g., Nice@123)
+7. Is the robot hardware connected and powered? (yes/no)
+
+**Wait for user to confirm hardware is ready before proceeding to Step 2.**
+
+**Only proceed after receiving ALL answers.**
+
 ### Prerequisites
 
 Before starting, ensure you have:
-- Jump server IP, username, password
-- Target robot IP, username, password
+- Jump server IP, username, password (ask user)
+- Target robot IP, username, password (ask user)
 - Conda environment with lerobot installed
 - V2Ray proxy (if HuggingFace access needed)
-- Robot hardware connected and powered
+- Robot hardware connected and powered (confirm with user)
 
 ### Step 1: Initialize Session
 
@@ -267,6 +284,8 @@ watch -n 2 'tmux capture-pane -t lerobot_eval:0 -p | tail -10'
 
 ## Complete Example
 
+**IMPORTANT: Replace all placeholders with actual values provided by the user.**
+
 ```bash
 # One-time setup on jump server
 # 1. Ensure tmux installed
@@ -275,24 +294,24 @@ sudo apt-get install -y tmux
 # 2. Ensure V2Ray running
 ps aux | grep v2ray
 
-# 3. Test robot connectivity
-sshpass -p 'Nice@123' ssh root@10.10.10.54 'hostname'
+# 3. Test robot connectivity (replace with actual values from user)
+sshpass -p 'TARGET_PASS' ssh TARGET_USER@TARGET_IP 'hostname'
 
 # Execute evaluation
 # Step 1: Create session
 tmux kill-session -t lerobot_eval 2>/dev/null
 tmux new-session -d -s lerobot_eval -x 240 -y 60
 
-# Step 2: Start robot host
-tmux send-keys -t lerobot_eval:0 "sshpass -p 'Nice@123' ssh -t -o StrictHostKeyChecking=no -X root@10.10.10.54 \"source /root/miniconda3/bin/activate && cd /root/workspace/lerobot_ros2 && bash cmd.sh\"" Enter
+# Step 2: Start robot host (replace TARGET_PASS, TARGET_USER, TARGET_IP)
+tmux send-keys -t lerobot_eval:0 "sshpass -p 'TARGET_PASS' ssh -t -o StrictHostKeyChecking=no -X TARGET_USER@TARGET_IP \"source /root/miniconda3/bin/activate && cd /root/workspace/lerobot_ros2 && bash cmd.sh\"" Enter
 sleep 5
 tmux send-keys -t lerobot_eval:0 "Enter"
 
-# Step 3: Start evaluation
+# Step 3: Start evaluation (replace TARGET_IP, JUMP_USER paths)
 tmux new-window -t lerobot_eval -n evaluate
-tmux send-keys -t lerobot_eval:1 "rm -rf /home/nice/.cache/huggingface/lerobot/ly/eval_dataset" Enter
+tmux send-keys -t lerobot_eval:1 "rm -rf /home/JUMP_USER/.cache/huggingface/lerobot/ly/eval_dataset" Enter
 sleep 2
-tmux send-keys -t lerobot_eval:1 "source /home/nice/miniconda3/bin/activate lerobot && export ALL_PROXY=socks5://127.0.0.1:10808 && export DISPLAY=:0 && cd /home/nice/ly/lerobot_ros2 && python examples/lekiwi/evaluate.py --id=lekiwi --remote_ip=10.10.10.54 --hf_model_id=/home/nice/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model --hf_dataset_id=ly/eval_dataset --is_headless_flag=False" Enter
+tmux send-keys -t lerobot_eval:1 "source /home/JUMP_USER/miniconda3/bin/activate lerobot && export ALL_PROXY=socks5://127.0.0.1:10808 && export DISPLAY=:0 && cd /home/JUMP_USER/ly/lerobot_ros2 && python examples/lekiwi/evaluate.py --id=lekiwi --remote_ip=TARGET_IP --hf_model_id=/home/JUMP_USER/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model --hf_dataset_id=ly/eval_dataset --is_headless_flag=False" Enter
 
 # Step 4: Monitor
 sleep 20
