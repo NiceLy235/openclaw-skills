@@ -309,88 +309,51 @@ def cmd_merge(args):
 
 
 def cmd_full(args):
-    """Handle full pipeline (split + merge)."""
+    """Handle full pipeline (merge only, no split)."""
     data_dir = Path(args.data_dir)
-    output_dir = Path(args.output_dir)
     
     print("="*60)
     print("  Full Dataset Preparation Pipeline")
     print("="*60)
     print()
     
-    # Step 1: Split
-    print("📁 Step 1: Splitting episodes...")
+    # Step 1: Collect all episodes
+    print("📁 Step 1: Collecting episodes...")
     episodes = collect_episodes(data_dir)
     
     if not episodes:
         print(f"❌ No valid episodes found in {data_dir}")
         return 1
     
-    train_episodes, val_episodes = split_episodes(
-        episodes,
-        train_ratio=args.train_ratio,
-        random_seed=args.random_seed
-    )
-    
-    train_dir = output_dir / "train"
-    val_dir = output_dir / "val"
-    
-    if train_dir.exists():
-        shutil.rmtree(train_dir)
-    if val_dir.exists():
-        shutil.rmtree(val_dir)
-    
-    train_count = copy_episodes(train_episodes, train_dir, "episodes")
-    val_count = copy_episodes(val_episodes, val_dir, "episodes")
-    
-    print(f"   Training: {train_count} episodes")
-    print(f"   Validation: {val_count} episodes")
+    print(f"   Found {len(episodes)} episodes")
     print()
     
-    # Step 2: Merge training set
-    print("📊 Step 2: Merging training dataset...")
-    train_repo_id = f"{args.repo_prefix}/train_merged"
+    # Step 2: Merge all episodes into one dataset (no split)
+    print("📊 Step 2: Merging all episodes into single dataset...")
+    merged_repo_id = f"{args.repo_prefix}/merged"
     
     success = merge_episodes_with_lerobot(
-        episodes_dir=train_dir,
-        repo_id=train_repo_id,
+        episodes_dir=data_dir,
+        repo_id=merged_repo_id,
         push_to_hub=False,
         conda_env=args.conda_env,
         proxy=args.proxy
     )
     
     if not success:
-        print("❌ Training merge failed")
-        return 1
-    
-    print()
-    
-    # Step 3: Merge validation set
-    print("📊 Step 3: Merging validation dataset...")
-    val_repo_id = f"{args.repo_prefix}/val_merged"
-    
-    success = merge_episodes_with_lerobot(
-        episodes_dir=val_dir,
-        repo_id=val_repo_id,
-        push_to_hub=False,
-        conda_env=args.conda_env,
-        proxy=args.proxy
-    )
-    
-    if not success:
-        print("❌ Validation merge failed")
+        print("❌ Merge failed")
         return 1
     
     print()
     print("="*60)
     print("✅ Full pipeline complete!")
     print("="*60)
-    print(f"Training dataset:   {train_repo_id}")
-    print(f"Validation dataset: {val_repo_id}")
+    print(f"Merged dataset: {merged_repo_id}")
+    print(f"Total episodes: {len(episodes)}")
     print()
     print("Ready for training:")
     print(f"  python task_manager.py submit \\")
-    print(f"    --dataset.repo_id {train_repo_id} \\")
+    print(f"    --dataset-repo-id {merged_repo_id} \\")
     print(f"    --model-name smolvla_base")
     
     return 0
@@ -421,12 +384,9 @@ def main():
     merge_parser.add_argument("--proxy", help="Proxy URL (e.g., http://127.0.0.1:10809)")
     
     # Full pipeline command
-    full_parser = subparsers.add_parser("full", help="Full pipeline: split + merge")
+    full_parser = subparsers.add_parser("full", help="Full pipeline: merge all episodes")
     full_parser.add_argument("--data-dir", required=True, help="Directory with raw episodes")
-    full_parser.add_argument("--output-dir", required=True, help="Output directory")
     full_parser.add_argument("--repo-prefix", default="ly", help="Repo ID prefix")
-    full_parser.add_argument("--train-ratio", type=float, default=0.8)
-    full_parser.add_argument("--random-seed", type=int, default=42)
     full_parser.add_argument("--conda-env", default="ly_robot")
     full_parser.add_argument("--proxy", help="Proxy URL")
     

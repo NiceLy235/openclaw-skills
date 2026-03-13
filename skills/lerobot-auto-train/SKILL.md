@@ -36,19 +36,17 @@ conda activate ly_robot
 
 ### 完整流程（推荐）
 
-一条命令完成：分割 → 合并 → 训练
+一条命令完成：合并 → 训练
 
 ```bash
 python scripts/prepare_dataset.py full \
   --data-dir /home/nice/ly/data/pre_merge_data/2026_03_04_10_06 \
-  --output-dir /home/nice/ly/data/training_data \
   --repo-prefix ly \
-  --train-ratio 0.8 \
   --proxy http://127.0.0.1:10809
 
 # 然后提交训练
 python scripts/task_manager.py submit \
-  --dataset-repo-id ly/train_merged \
+  --dataset-repo-id ly/merged \
   --model-name smolvla_base \
   --proxy http://127.0.0.1:10809 \
   --hf-token YOUR_TOKEN
@@ -56,50 +54,21 @@ python scripts/task_manager.py submit \
 
 ### 分步执行
 
-#### 1. 分割数据集
+#### 1. 合并数据集
+
+使用 `lerobot_edit_dataset` 合并所有 episodes：
 
 ```bash
-# 将原始 episodes 分割为训练集和验证集
-python scripts/prepare_dataset.py split \
-  --data-dir /path/to/raw_episodes \
-  --output-dir ./processed_data \
-  --train-ratio 0.8
-```
-
-**输出**:
-```
-processed_data/
-├── train/
-│   ├── episodes_0/
-│   ├── episodes_1/
-│   └── ...
-├── val/
-│   ├── episodes_0/
-│   └── ...
-└── split_info.json
-```
-
-#### 2. 合并数据集
-
-使用 `lerobot_edit_dataset` 合并：
-
-```bash
-# 合并训练集
+# 合并所有 episodes 到一个数据集
 python scripts/prepare_dataset.py merge \
-  --episodes-dir ./processed_data/train \
-  --repo-id ly/train_merged \
-  --proxy http://127.0.0.1:10809
-
-# 合并验证集
-python scripts/prepare_dataset.py merge \
-  --episodes-dir ./processed_data/val \
-  --repo-id ly/val_merged \
+  --episodes-dir /path/to/raw_episodes \
+  --repo-id ly/merged \
   --proxy http://127.0.0.1:10809
 ```
 
-**输出**: 数据集保存到 `~/.cache/huggingface/lerobot/ly/train_merged`
+**输出**: 数据集保存到 `~/.cache/huggingface/lerobot/ly/merged`
 
-#### 3. 提交训练任务
+#### 2. 提交训练任务
 
 ```bash
 python scripts/task_manager.py submit \
@@ -145,12 +114,21 @@ python scripts/task_manager.py logs <task_id>
 
 ### prepare_dataset.py
 
+#### merge 命令
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--episodes-dir` | episodes 目录 | 必填 |
+| `--repo-id` | 合并后的 repo ID | 必填 |
+| `--proxy` | 代理 URL | 无 |
+| `--conda-env` | Conda 环境名 | ly_robot |
+
+#### full 命令
+
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `--data-dir` | 原始数据目录 | 必填 |
-| `--output-dir` | 输出目录 | 必填 |
-| `--train-ratio` | 训练集比例 | 0.8 |
-| `--repo-id` | 合并后的 repo ID | 必填 |
+| `--repo-prefix` | repo ID 前缀 | ly |
 | `--proxy` | 代理 URL | 无 |
 | `--conda-env` | Conda 环境名 | ly_robot |
 
@@ -179,26 +157,21 @@ Agent:
 
 🚀 开始完整训练流程...
 
-# 1. 准备数据集（分割 + 合并）
+# 1. 准备数据集（合并所有 episodes）
 $ python scripts/prepare_dataset.py full \
   --data-dir /home/nice/ly/data/pre_merge_data/2026_03_04_10_06 \
-  --output-dir /home/nice/ly/data/training_data \
   --repo-prefix ly \
   --proxy http://127.0.0.1:10809
 
-📂 Step 1: Splitting episodes...
-   Training: 12 episodes
-   Validation: 3 episodes
+📁 Step 1: Collecting episodes...
+   Found 15 episodes
 
-📊 Step 2: Merging training dataset...
-✅ Merge successful: ly/train_merged
-
-📊 Step 3: Merging validation dataset...
-✅ Merge successful: ly/val_merged
+📊 Step 2: Merging all episodes into single dataset...
+✅ Merge successful: ly/merged
 
 # 2. 提交训练任务
 $ python scripts/task_manager.py submit \
-  --dataset-repo-id ly/train_merged \
+  --dataset-repo-id ly/merged \
   --model-name smolvla_base \
   --batch-size 32 \
   --steps 100000 \
@@ -252,7 +225,6 @@ $ python scripts/task_manager.py status train_20260311_150000_abc123
 
 | 旧流程 | 新流程 (lerobot-auto-train) |
 |--------|------------------------------|
-| 手动分割数据 | `prepare_dataset.py split` |
 | 手动调用 `lerobot_edit_dataset` | `prepare_dataset.py merge` |
 | 手动编写训练脚本 | `task_manager.py submit` |
 | 手动监控日志 | `task_manager.py status/logs` |
@@ -260,5 +232,5 @@ $ python scripts/task_manager.py status train_20260311_150000_abc123
 **一条命令完成所有步骤**:
 ```bash
 python scripts/prepare_dataset.py full --data-dir ... --repo-prefix ly
-python scripts/task_manager.py submit --dataset-repo-id ly/train_merged
+python scripts/task_manager.py submit --dataset-repo-id ly/merged
 ```
