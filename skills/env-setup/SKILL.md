@@ -478,7 +478,200 @@ All scripts are idempotent and can be safely run multiple times.
 
 ## Common Issues and Solutions
 
-### Issue 1: PyTorch/torchvision Version Mismatch
+### Issue 1: V2Ray Installation Failures
+
+**Scenario A: Cannot Download from GitHub**
+- **Symptom**: `curl: (28) Connection timed out` when downloading V2Ray
+- **Cause**: GitHub blocked in restricted network environments
+- **Solutions**:
+  1. **Use apt (Ubuntu/Debian)**:
+     ```bash
+     apt-get install v2ray
+     ```
+     ⚠️ **Note**: apt version (4.x) is old and may have bugs:
+     - `crypto/hmac: hash generation function does not produce unique values`
+     - Consider upgrading if you encounter issues
+  
+  2. **Upload from local machine**:
+     ```bash
+     # On local machine
+     tar -czf v2ray-local.tar.gz /usr/local/bin/v2ray /usr/local/share/v2ray/*.dat
+     scp v2ray-local.tar.gz user@remote:/tmp/
+     
+     # On remote server
+     tar -xzf /tmp/v2ray-local.tar.gz -C /
+     ```
+  
+  3. **Use GitHub mirrors** (if available):
+     ```bash
+     # Try these mirrors
+     https://hub.fastgit.xyz/v2fly/v2ray-core/...
+     https://ghproxy.com/https://github.com/v2fly/...
+     ```
+
+**Scenario B: V2Ray Version Too Old (apt)**
+- **Symptom**: `panic: crypto/hmac: hash generation function does not produce unique values`
+- **Cause**: apt version 4.x has bugs in VMess AEAD encryption
+- **Solution**: Upload newer version (5.x+) from local machine
+
+**Scenario C: systemd Not Available (Container/WSL)**
+- **Symptom**: `System has not been booted with systemd`
+- **Cause**: Running in container or WSL environment
+- **Solution**: Start V2Ray manually:
+  ```bash
+  nohup /usr/local/bin/v2ray/v2ray run -c /etc/v2ray/config.json > /tmp/v2ray.log 2>&1 &
+  ```
+
+### Issue 2: Git Clone Performance Issues
+
+**Scenario A: Large Repository Clone Timeout**
+- **Symptom**: `git clone` hangs or takes >10 minutes
+- **Cause**: Large repository size, slow proxy, network issues
+- **Solutions**:
+  1. **Use shallow clone** (recommended):
+     ```bash
+     git clone --depth 1 https://github.com/user/repo.git
+     ```
+     - Downloads only latest commit
+     - Much faster for large repos
+  
+  2. **Don't use proxy if server can access directly**:
+     ```bash
+     # Check if direct access works
+     curl -I https://github.com  # If works, don't use proxy
+     ```
+  
+  3. **Disable proxy for git**:
+     ```bash
+     unset ALL_PROXY
+     git clone https://github.com/user/repo.git
+     ```
+
+**Scenario B: git index-pack Stuck**
+- **Symptom**: `git index-pack --stdin` runs for >10 minutes
+- **Cause**: Large pack file, slow I/O, or proxy issues
+- **Solution**: 
+  - Stop and retry with shallow clone
+  - Or wait patiently (large repos can take 15-20 minutes)
+
+### Issue 3: Real-time Installation Progress Display
+
+**How to Show Real-time Progress During Installation:**
+
+**Method 1: Use message tool (for chat/Feishu integration)**
+```python
+# In your skill script
+import subprocess
+import time
+
+# Send start message
+message(action="send", message="🚀 开始安装 PyTorch...")
+
+# Run installation with output capture
+proc = subprocess.Popen(
+    ["pip3", "install", "torch"],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.STDOUT,
+    text=True
+)
+
+# Stream output and send updates
+for line in proc.stdout:
+    if "Downloading" in line or "%" in line:
+        # Extract progress
+        message(action="send", message=f"📊 {line.strip()}")
+
+# Send completion
+message(action="send", message="✅ PyTorch 安装完成！")
+```
+
+**Method 2: Use tail -f for log files**
+```bash
+# In installation script
+LOG_FILE="/tmp/install_progress.log"
+
+# Send progress to log file
+pip3 install torch 2>&1 | tee "$LOG_FILE" &
+
+# User can watch progress in another terminal
+tail -f "$LOG_FILE"
+```
+
+**Method 3: Use progress bar tools**
+```bash
+# Install with verbose output
+pip3 install torch --verbose --progress-bar on
+
+# Or use pv (pipe viewer)
+pip3 download torch | pv -l > /dev/null
+```
+
+**Method 4: Poll process status periodically**
+```python
+# Check installation status every 30 seconds
+while is_process_running("pip3 install"):
+    status = check_pip_progress()
+    message(action="send", message=f"🔄 进度: {status}")
+    time.sleep(30)
+```
+
+### Issue 4: PyTorch Installation SOCKS Proxy Error
+
+**Symptom**: `ERROR: Could not install packages due to an OSError: Missing dependencies for SOCKS support`
+
+**Cause**: pip requires PySocks for SOCKS5 proxy
+
+**Solutions**:
+1. **Install PySocks**:
+   ```bash
+   pip3 install PySocks
+   pip3 install torch --index-url https://download.pytorch.org/whl/cu121
+   ```
+
+2. **Use HTTP proxy instead**:
+   ```bash
+   export HTTP_PROXY=http://127.0.0.1:10809
+   export HTTPS_PROXY=http://127.0.0.1:10809
+   pip3 install torch
+   ```
+
+3. **Don't use proxy if server can access directly** (check first):
+   ```bash
+   # Test direct access
+   curl -I https://download.pytorch.org/whl/torch/
+   
+   # If works, unset proxy
+   unset ALL_PROXY HTTP_PROXY HTTPS_PROXY
+   pip3 install torch
+   ```
+
+### Issue 5: LeRobot Import Failure (ModuleNotFoundError)
+
+**Symptom**: `ModuleNotFoundError: No module named 'lerobot'` after installation
+
+**Cause**: LeRobot uses `src/lerobot` directory structure (not standard layout)
+
+**Solutions**:
+1. **Add to PYTHONPATH**:
+   ```bash
+   export PYTHONPATH=/root/lerobot_ros2/src:$PYTHONPATH
+   python3 -c "import lerobot; print(lerobot.__version__)"
+   ```
+
+2. **Make permanent**:
+   ```bash
+   echo 'export PYTHONPATH=/root/lerobot_ros2/src:$PYTHONPATH' >> ~/.bashrc
+   source ~/.bashrc
+   ```
+
+3. **Use correct import path**:
+   ```python
+   import sys
+   sys.path.insert(0, "/path/to/lerobot_ros2/src")
+   import lerobot
+   ```
+
+### Issue 6: PyTorch/torchvision Version Mismatch
 
 **Symptom**: `RuntimeError: operator torchvision::nms does not exist`
 
@@ -487,7 +680,7 @@ All scripts are idempotent and can be safely run multiple times.
 python3 scripts/resolve_dependencies.py --fix
 ```
 
-### Issue 2: Cannot Access HuggingFace
+### Issue 7: Cannot Access HuggingFace
 
 **Symptom**: `OSError: Can't load processor for ...`
 
@@ -496,7 +689,7 @@ python3 scripts/resolve_dependencies.py --fix
 2. Use activation script: `source ~/opt/lerobot/activate.sh`
 3. Or manually: `export HTTPS_PROXY=http://127.0.0.1:10809`
 
-### Issue 3: Missing Dependencies
+### Issue 8: Missing Dependencies
 
 **Symptom**: `ImportError: Package 'num2words' is required`
 
@@ -504,6 +697,24 @@ python3 scripts/resolve_dependencies.py --fix
 ```bash
 source ~/opt/lerobot/venv/bin/activate
 pip install num2words transformers accelerate sentencepiece
+```
+
+### Issue 9: Installation in Container Environment
+
+**Special Considerations for Docker/LXC/Container Environments:**
+
+1. **No systemd**: Start services manually
+2. **Limited disk space**: Monitor usage carefully
+3. **Network restrictions**: Test direct access first
+4. **Persistent storage**: Save important data to mounted volumes
+
+```bash
+# Example: Start V2Ray in container
+nohup /usr/local/bin/v2ray/v2ray run -c /etc/v2ray/config.json > /tmp/v2ray.log 2>&1 &
+
+# Check if running
+ps aux | grep v2ray
+tail -f /tmp/v2ray.log
 ```
 
 For more issues, see [references/troubleshooting_lerobot.md](references/troubleshooting_lerobot.md)
