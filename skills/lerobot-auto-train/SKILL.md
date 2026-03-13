@@ -21,6 +21,110 @@ description: >
 - ✅ 实时进度监控
 - ✅ 代理和 HuggingFace Token 配置
 - ✅ 自动验证和恢复
+- ⚠️ **训练前必须确认参数**（见下方流程）
+
+## ⚠️ 训练前确认流程（强制）
+
+**在提交任何训练任务之前，Agent 必须执行以下确认步骤：**
+
+### 步骤 1: 收集用户需求
+
+询问用户：
+1. **模型选择**: 使用什么模型？（默认: smolvla_base）
+2. **训练参数**: batch_size, steps, save_freq 等
+3. **数据集**: 数据集路径或已合并的 repo_id
+4. **其他配置**: 代理、HuggingFace Token 等
+
+### 步骤 2: 生成配置预览
+
+使用 `task_manager.py submit --dry-run` 生成完整配置：
+
+```bash
+python scripts/task_manager.py submit \
+  --dataset-repo-id ly/merged \
+  --model-name smolvla_base \
+  --batch-size 32 \
+  --steps 100000 \
+  --dry-run
+```
+
+### 步骤 3: 展示给用户
+
+**必须展示以下信息：**
+
+```
+📋 训练配置预览
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 数据集信息:
+  • 数据集: ly/merged
+  • Episodes: 15
+  • 位置: ~/.cache/huggingface/lerobot/ly/merged
+
+🤖 模型配置:
+  • 模型: smolvla_base
+  • Policy Type: smolvla
+  • 预训练权重: lerobot/smolvla_base
+
+📊 训练参数:
+  • Batch Size: 32
+  • Steps: 100000
+  • Save Frequency: 每 5000 步
+  • Eval Frequency: 每 1000 步
+  • Workers: 16
+
+💻 执行环境:
+  • 脚本位置: /home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_train.py
+  • Conda 环境: ly_robot
+  • 设备: cuda
+  • 输出目录: outputs/mylerobot_train/0313_1052
+
+🔧 完整命令:
+```bash
+python -m lerobot.scripts.lerobot_train \
+  --policy.type smolvla \
+  --policy.pretrained_path lerobot/smolvla_base \
+  --policy.load_vlm_weights true \
+  --policy.device cuda \
+  --policy.repo_id ly/smolvla_base_policy \
+  --policy.push_to_hub false \
+  --dataset.repo_id ly/merged \
+  --output_dir outputs/mylerobot_train/0313_1052 \
+  --job_name train_smolvla_base_20260313_1052 \
+  --batch_size 32 \
+  --steps 100000 \
+  --save_freq 5000 \
+  --eval_freq 1000 \
+  --num_workers 16 \
+  --wandb.enable false
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+确认启动训练？(yes/no)
+```
+
+### 步骤 4: 等待用户确认
+
+- 用户回复 "yes" → 提交训练任务
+- 用户回复 "no" → 取消或修改参数
+- 用户未回复 → **不要提交任务**
+
+### 步骤 5: 提交任务
+
+确认后执行：
+
+```bash
+python scripts/task_manager.py submit \
+  --dataset-repo-id ly/merged \
+  --model-name smolvla_base \
+  --batch-size 32 \
+  --steps 100000 \
+  --proxy http://127.0.0.1:10809 \
+  --hf-token YOUR_TOKEN
+```
+
+---
 
 ## 前置要求
 
@@ -169,7 +273,67 @@ $ python scripts/prepare_dataset.py full \
 📊 Step 2: Merging all episodes into single dataset...
 ✅ Merge successful: ly/merged
 
-# 2. 提交训练任务
+# 2. 生成配置预览（确认步骤）
+$ python scripts/task_manager.py submit \
+  --dataset-repo-id ly/merged \
+  --model-name smolvla_base \
+  --batch-size 32 \
+  --steps 100000 \
+  --dry-run
+
+📋 训练配置预览
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔄 数据集信息:
+  • 数据集: ly/merged
+  • Episodes: 15
+  • 位置: ~/.cache/huggingface/lerobot/ly/merged
+
+🤖 模型配置:
+  • 模型: smolvla_base
+  • Policy Type: smolvla
+  • 预训练权重: lerobot/smolvla_base
+
+📊 训练参数:
+  • Batch Size: 32
+  • Steps: 100000
+  • Save Frequency: 每 5000 步
+  • Eval Frequency: 每 1000 步
+  • Workers: 16
+
+💻 执行环境:
+  • 脚本位置: /home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_train.py
+  • Conda 环境: ly_robot
+  • 设备: cuda
+  • 输出目录: outputs/mylerobot_train/0313_1052
+
+🔧 完整命令:
+```bash
+python -m lerobot.scripts.lerobot_train \
+  --policy.type smolvla \
+  --policy.pretrained_path lerobot/smolvla_base \
+  --policy.load_vlm_weights true \
+  --policy.device cuda \
+  --policy.repo_id ly/smolvla_base_policy \
+  --policy.push_to_hub false \
+  --dataset.repo_id ly/merged \
+  --output_dir outputs/mylerobot_train/0313_1052 \
+  --job_name train_smolvla_base_20260313_1052 \
+  --batch_size 32 \
+  --steps 100000 \
+  --save_freq 5000 \
+  --eval_freq 1000 \
+  --num_workers 16 \
+  --wandb.enable false
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+确认启动训练？(yes/no)
+
+用户: "确认，使用这些参数"
+
+# 3. 提交训练任务（移除 --dry-run）
 $ python scripts/task_manager.py submit \
   --dataset-repo-id ly/merged \
   --model-name smolvla_base \
@@ -181,7 +345,7 @@ $ python scripts/task_manager.py submit \
 ✅ Task submitted: train_20260311_150000_abc123
 🚀 Training started (PID: 57526)
 
-# 3. 监控
+# 4. 监控
 $ python scripts/task_manager.py status train_20260311_150000_abc123
 
 {

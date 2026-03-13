@@ -76,10 +76,14 @@ class TaskManager:
         hf_token: Optional[str] = None,
         conda_env: str = "ly_robot",
         job_name: Optional[str] = None,
+        dry_run: bool = False,
         **kwargs
     ) -> Dict:
         """
         Submit a new training task.
+
+        Args:
+            dry_run: If True, only show configuration without executing
 
         Returns:
             Task metadata with task_id
@@ -87,9 +91,12 @@ class TaskManager:
         # Generate unique task ID
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         task_id = f"train_{timestamp}_{uuid.uuid4().hex[:8]}"
-        
+
         if not job_name:
             job_name = f"train_{model_name}_{timestamp}"
+
+        # Format output directory with timestamp
+        output_dir_formatted = f"{output_dir}/{datetime.now().strftime('%m%d_%H%M')}"
 
         # Create task metadata
         task_meta = {
@@ -100,7 +107,7 @@ class TaskManager:
                 "dataset_repo_id": dataset_repo_id,
                 "model_name": model_name,
                 "policy_type": policy_type,
-                "output_dir": output_dir,
+                "output_dir": output_dir_formatted,
                 "batch_size": batch_size,
                 "steps": steps,
                 "save_freq": save_freq,
@@ -138,6 +145,10 @@ class TaskManager:
             "checkpoint_dir": None
         }
 
+        # Dry run mode: only show configuration
+        if dry_run:
+            return self._show_dry_run(task_meta, proxy, hf_token, conda_env)
+
         # Save task metadata
         task_file = self.tasks_dir / task_id / "meta.json"
         task_file.parent.mkdir(parents=True, exist_ok=True)
@@ -152,6 +163,83 @@ class TaskManager:
             self._start_background_task(task_id, task_meta, proxy, hf_token, conda_env)
         else:
             self._start_sync_task(task_id, task_meta)
+
+        return task_meta
+
+    def _show_dry_run(
+        self,
+        task_meta: Dict,
+        proxy: Optional[str] = None,
+        hf_token: Optional[str] = None,
+        conda_env: str = "ly_robot"
+    ) -> Dict:
+        """Show configuration preview in dry-run mode."""
+        config = task_meta["config"]
+
+        # Count episodes if dataset exists
+        dataset_path = Path.home() / ".cache" / "huggingface" / "lerobot" / config["dataset_repo_id"]
+        episode_count = "unknown"
+        if dataset_path.exists():
+            try:
+                # Try to read meta/info.json
+                info_file = dataset_path / "meta" / "info.json"
+                if info_file.exists():
+                    with open(info_file) as f:
+                        info = json.load(f)
+                        episode_count = info.get("total_episodes", "unknown")
+            except:
+                pass
+
+        # Build the command
+        cmd = self._build_train_command(task_meta, proxy, hf_token, conda_env)
+
+        # Print formatted preview
+        print("\n" + "="*60)
+        print("📋 训练配置预览")
+        print("="*60)
+        print()
+
+        print("🔄 数据集信息:")
+        print(f"  • 数据集: {config['dataset_repo_id']}")
+        print(f"  • Episodes: {episode_count}")
+        print(f"  • 位置: ~/.cache/huggingface/lerobot/{config['dataset_repo_id']}")
+        print()
+
+        print("🤖 模型配置:")
+        print(f"  • 模型: {config['model_name']}")
+        print(f"  • Policy Type: {config['policy_type']}")
+        if config['policy_type'] == "smolvla":
+            print(f"  • 预训练权重: lerobot/smolvla_base")
+        print()
+
+        print("📊 训练参数:")
+        print(f"  • Batch Size: {config['batch_size']}")
+        print(f"  • Steps: {config['steps']}")
+        print(f"  • Save Frequency: 每 {config['save_freq']} 步")
+        print(f"  • Eval Frequency: 每 {config['eval_freq']} 步")
+        print(f"  • Workers: {config['num_workers']}")
+        print()
+
+        print("💻 执行环境:")
+        print(f"  • 脚本位置: {self.lerobot_dir}/src/lerobot/scripts/lerobot_train.py")
+        print(f"  • Conda 环境: {conda_env}")
+        print(f"  • 设备: {config['device']}")
+        print(f"  • 输出目录: {config['output_dir']}")
+        if proxy:
+            print(f"  • 代理: {proxy}")
+        print()
+
+        print("🔧 完整命令:")
+        print("```bash")
+        print(cmd)
+        print("```")
+        print()
+
+        print("="*60)
+        print("⚠️  这是预览模式 (--dry-run)")
+        print("    实际执行时请移除 --dry-run 参数")
+        print("="*60)
+        print()
 
         return task_meta
 
@@ -426,6 +514,7 @@ def main():
     submit_parser.add_argument("--conda-env", default="ly_robot")
     submit_parser.add_argument("--priority", type=int, default=5)
     submit_parser.add_argument("--background", action="store_true", default=True)
+    submit_parser.add_argument("--dry-run", action="store_true", help="Show configuration without executing")
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Check task status")
@@ -465,9 +554,14 @@ def main():
             hf_token=args.hf_token,
             conda_env=args.conda_env,
             priority=args.priority,
-            background=args.background
+            background=args.background,
+            dry_run=args.dry_run
         )
-        print(json.dumps(meta, indent=2))
+        if args.dry_run:
+            # Already printed preview in _show_dry_run
+            pass
+        else:
+            print(json.dumps(meta, indent=2))
 
     elif args.command == "status":
         status = manager.get_task_status(args.task_id)
