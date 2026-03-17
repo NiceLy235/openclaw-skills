@@ -187,7 +187,7 @@ Use this template for ANY training operation:
 - **Command**:
   ```bash
   python scripts/task_manager.py submit \
-    --dataset-repo-id ly/merged \
+    --dataset-repo-id train/merged \
     --model-name smolvla_base \
     --batch-size 32 \
     --steps 100000 \
@@ -216,7 +216,7 @@ Use this template for ANY training operation:
 - **Command**:
   ```bash
   python scripts/task_manager.py submit \
-    --dataset-repo-id ly/merged \
+    --dataset-repo-id train/merged \
     --model-name smolvla_base \
     --batch-size 32 \
     --steps 100000 \
@@ -265,7 +265,7 @@ Use this template for ANY training operation:
 
 ```bash
 python scripts/task_manager.py submit \
-  --dataset-repo-id ly/merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --batch-size 32 \
   --steps 100000 \
@@ -281,9 +281,9 @@ python scripts/task_manager.py submit \
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔄 数据集信息:
-  • 数据集: ly/merged
+  • 数据集: train/merged
   • Episodes: 15
-  • 位置: ~/.cache/huggingface/lerobot/ly/merged
+  • 位置: ~/.cache/huggingface/lerobot/train/merged
 
 🤖 模型配置:
   • 模型: smolvla_base
@@ -312,7 +312,7 @@ python -m lerobot.scripts.lerobot_train \
   --policy.device cuda \
   --policy.repo_id ly/smolvla_base_policy \
   --policy.push_to_hub false \
-  --dataset.repo_id ly/merged \
+  --dataset.repo_id train/merged \
   --output_dir outputs/mylerobot_train/0313_1052 \
   --job_name train_smolvla_base_20260313_1052 \
   --batch_size 32 \
@@ -340,7 +340,7 @@ python -m lerobot.scripts.lerobot_train \
 
 ```bash
 python scripts/task_manager.py submit \
-  --dataset-repo-id ly/merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --batch-size 32 \
   --steps 100000 \
@@ -374,7 +374,7 @@ python scripts/prepare_dataset.py full \
 
 # 然后提交训练
 python scripts/task_manager.py submit \
-  --dataset-repo-id ly/merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --proxy http://127.0.0.1:10809 \
   --hf-token YOUR_TOKEN
@@ -390,11 +390,11 @@ python scripts/task_manager.py submit \
 # 合并所有 episodes 到一个数据集
 python scripts/prepare_dataset.py merge \
   --episodes-dir /path/to/raw_episodes \
-  --repo-id ly/merged \
+  --repo-id train/merged \
   --proxy http://127.0.0.1:10809
 ```
 
-**输出**: 数据集保存到 `~/.cache/huggingface/lerobot/ly/merged`
+**输出**: 数据集保存到 `~/.cache/huggingface/lerobot/train/merged`
 
 #### 2. 提交训练任务
 
@@ -496,11 +496,11 @@ $ python scripts/prepare_dataset.py full \
    Found 15 episodes
 
 📊 Step 2: Merging all episodes into single dataset...
-✅ Merge successful: ly/merged
+✅ Merge successful: train/merged
 
 # 2. 生成配置预览（确认步骤）
 $ python scripts/task_manager.py submit \
-  --dataset-repo-id ly/merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --batch-size 32 \
   --steps 100000 \
@@ -510,9 +510,9 @@ $ python scripts/task_manager.py submit \
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔄 数据集信息:
-  • 数据集: ly/merged
+  • 数据集: train/merged
   • Episodes: 15
-  • 位置: ~/.cache/huggingface/lerobot/ly/merged
+  • 位置: ~/.cache/huggingface/lerobot/train/merged
 
 🤖 模型配置:
   • 模型: smolvla_base
@@ -541,7 +541,7 @@ python -m lerobot.scripts.lerobot_train \
   --policy.device cuda \
   --policy.repo_id ly/smolvla_base_policy \
   --policy.push_to_hub false \
-  --dataset.repo_id ly/merged \
+  --dataset.repo_id train/merged \
   --output_dir outputs/mylerobot_train/0313_1052 \
   --job_name train_smolvla_base_20260313_1052 \
   --batch_size 32 \
@@ -560,7 +560,7 @@ python -m lerobot.scripts.lerobot_train \
 
 # 3. 提交训练任务（移除 --dry-run）
 $ python scripts/task_manager.py submit \
-  --dataset-repo-id ly/merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --batch-size 32 \
   --steps 100000 \
@@ -621,5 +621,5 @@ $ python scripts/task_manager.py status train_20260311_150000_abc123
 **一条命令完成所有步骤**:
 ```bash
 python scripts/prepare_dataset.py full --data-dir ... --repo-prefix ly
-python scripts/task_manager.py submit --dataset-repo-id ly/merged
+python scripts/task_manager.py submit --dataset-repo-id train/merged
 ```
