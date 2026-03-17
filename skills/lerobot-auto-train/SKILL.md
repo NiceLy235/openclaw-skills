@@ -176,7 +176,7 @@ Use this template for ANY training operation:
   ```bash
   python scripts/prepare_dataset.py full \
     --data-dir /path/to/data \
-    --repo-prefix ly \
+    --repo-prefix train \
     --proxy http://127.0.0.1:10809
   ```
 - **Expected**: Dataset merged successfully, repo_id returned
@@ -310,7 +310,7 @@ python -m lerobot.scripts.lerobot_train \
   --policy.pretrained_path lerobot/smolvla_base \
   --policy.load_vlm_weights true \
   --policy.device cuda \
-  --policy.repo_id ly/smolvla_base_policy \
+  --policy.repo_id train/smolvla_base_policy \
   --policy.push_to_hub false \
   --dataset.repo_id train/merged \
   --output_dir outputs/mylerobot_train/0313_1052 \
@@ -369,7 +369,7 @@ conda activate lerobot
 ```bash
 python scripts/prepare_dataset.py full \
   --data-dir /home/nice/ly/data/pre_merge_data/2026_03_04_10_06 \
-  --repo-prefix ly \
+  --repo-prefix train \
   --proxy http://127.0.0.1:10809
 
 # 然后提交训练
@@ -400,7 +400,7 @@ python scripts/prepare_dataset.py merge \
 
 ```bash
 python scripts/task_manager.py submit \
-  --dataset-repo-id ly/train_merged \
+  --dataset-repo-id train/merged \
   --model-name smolvla_base \
   --policy-type smolvla \
   --batch-size 32 \
@@ -456,7 +456,7 @@ python scripts/task_manager.py logs <task_id>
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
 | `--data-dir` | 原始数据目录 | 必填 |
-| `--repo-prefix` | repo ID 前缀 | ly |
+| `--repo-prefix` | repo ID 前缀 | train |
 | `--proxy` | 代理 URL | 无 |
 | `--conda-env` | Conda 环境名 | lerobot |
 
@@ -489,7 +489,7 @@ Agent:
 # 1. 准备数据集（合并所有 episodes）
 $ python scripts/prepare_dataset.py full \
   --data-dir /home/nice/ly/data/pre_merge_data/2026_03_04_10_06 \
-  --repo-prefix ly \
+  --repo-prefix train \
   --proxy http://127.0.0.1:10809
 
 📁 Step 1: Collecting episodes...
@@ -539,7 +539,7 @@ python -m lerobot.scripts.lerobot_train \
   --policy.pretrained_path lerobot/smolvla_base \
   --policy.load_vlm_weights true \
   --policy.device cuda \
-  --policy.repo_id ly/smolvla_base_policy \
+  --policy.repo_id train/smolvla_base_policy \
   --policy.push_to_hub false \
   --dataset.repo_id train/merged \
   --output_dir outputs/mylerobot_train/0313_1052 \
@@ -620,6 +620,6 @@ $ python scripts/task_manager.py status train_20260311_150000_abc123
 
 **一条命令完成所有步骤**:
 ```bash
-python scripts/prepare_dataset.py full --data-dir ... --repo-prefix ly
+python scripts/prepare_dataset.py full --data-dir ... --repo-prefix train
 python scripts/task_manager.py submit --dataset-repo-id train/merged
 ```

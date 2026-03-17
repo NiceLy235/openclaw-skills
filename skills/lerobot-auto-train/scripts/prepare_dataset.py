@@ -386,7 +386,7 @@ def main():
     # Full pipeline command
     full_parser = subparsers.add_parser("full", help="Full pipeline: merge all episodes")
     full_parser.add_argument("--data-dir", required=True, help="Directory with raw episodes")
-    full_parser.add_argument("--repo-prefix", default="ly", help="Repo ID prefix")
+    full_parser.add_argument("--repo-prefix", default="train", help="Repo ID prefix")
     full_parser.add_argument("--conda-env", default="ly_robot")
     full_parser.add_argument("--proxy", help="Proxy URL")
     

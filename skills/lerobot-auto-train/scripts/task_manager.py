@@ -329,7 +329,7 @@ class TaskManager:
             cmd_parts.append("--policy.load_vlm_weights true")
         
         cmd_parts.append(f"--policy.device {config.get('device', 'cuda')}")
-        cmd_parts.append(f"--policy.repo_id ly/{config['model_name']}_policy")
+        cmd_parts.append(f"--policy.repo_id train/{config['model_name']}_policy")
         cmd_parts.append("--policy.push_to_hub false")
         
         # Dataset configuration
@@ -498,7 +498,7 @@ def main():
 
     # Submit command
     submit_parser = subparsers.add_parser("submit", help="Submit training task")
-    submit_parser.add_argument("--dataset-repo-id", required=True, help="Dataset repo ID (e.g., ly/train_merged)")
+    submit_parser.add_argument("--dataset-repo-id", required=True, help="Dataset repo ID (e.g., train/merged)")
     submit_parser.add_argument("--model-name", default="smolvla_base")
     submit_parser.add_argument("--policy-type", default="smolvla", choices=["smolvla", "act"])
     submit_parser.add_argument("--output-dir", default="outputs/mylerobot_train")
