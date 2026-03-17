@@ -27,7 +27,7 @@ class DependencyResolver:
             "huggingface-hub": "0.35.2",
             "packaging": "25.0",
             "protobuf": "6.30.2",
-            "transformers": "5.3.0",
+            "transformers": "4.48.0",  # Changed from 5.3.0 to be compatible with huggingface-hub <0.36.0
             "num2words": "latest",
         }
     }
