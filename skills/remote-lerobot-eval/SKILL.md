@@ -93,17 +93,33 @@ Execute and monitor lerobot evaluation tasks on remote machines via jump server 
 
 Use this template for ANY remote evaluation operation:
 
-### Step 1: Collect Required Parameters
-- **Action**: Ask user for all required connection parameters
-- **Required inputs**:
+### Step 1: Collect Required Parameters and Choose Evaluation Mode
+- **Action**: Ask user for evaluation mode and required parameters
+- **Evaluation Modes**:
+  - **Mode A**: Real Robot Evaluation (requires hardware connection)
+  - **Mode B**: Local Dataset Evaluation (no hardware needed)
+- **Required inputs for Mode A (Real Robot)**:
   - Jump server IP, username, password
   - Target robot IP, username, password
   - Model path, dataset ID
   - Confirmation that hardware is connected and powered
-- **Expected**: All required parameters provided
-**[Ask user, verify all inputs]**
+- **Required inputs for Mode B (Local Dataset)**:
+  - Jump server IP, username, password
+  - Model path (policy_path)
+  - Dataset ID (repo_id)
+  - No hardware connection required
+- **Expected**: Evaluation mode selected and all required parameters provided
+**[Ask user to choose mode, verify all inputs]**
 
-### Step 2: SSH to Jump Server
+---
+
+## Mode A: Real Robot Evaluation
+
+**Use this mode when**: You want to evaluate on physical robot hardware
+
+**Prerequisites**: Robot hardware connected and powered
+
+### Step A1: SSH to Jump Server
 - **Action**: Connect to jump server
 - **Command**:
   ```bash
@@ -112,7 +128,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: Successful SSH connection to jump server
 **[Run command, verify, report]**
 
-### Step 3: Verify Environment
+### Step A2: Verify Environment
 - **Action**: Check tmux installation and V2Ray status
 - **Command**:
   ```bash
@@ -123,7 +139,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: tmux installed, V2Ray running, GPU detected
 **[Run commands, verify, report]**
 
-### Step 4: Test Robot Connectivity
+### Step A3: Test Robot Connectivity
 - **Action**: Verify connection to target robot
 - **Command**:
   ```bash
@@ -132,7 +148,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: Robot hostname returned
 **[Run command, verify, report]**
 
-### Step 5: Initialize tmux Session
+### Step A4: Initialize tmux Session
 - **Action**: Create tmux session for evaluation
 - **Command**:
   ```bash
@@ -143,7 +159,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: tmux session created successfully
 **[Run command, verify, report]**
 
-### Step 6: Start Robot Host (Window 0)
+### Step A5: Start Robot Host (Window 0)
 - **Action**: SSH to robot and start cmd.sh
 - **Command**:
   ```bash
@@ -154,7 +170,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: Robot host started, showing "No command available"
 **[Run command, verify, report]**
 
-### Step 7: Start Evaluation Script (Window 1)
+### Step A6: Start Evaluation Script (Window 1)
 - **Action**: Clear dataset cache and start evaluation
 - **Command**:
   ```bash
@@ -166,7 +182,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: Evaluation script started, loading model
 **[Run command, verify, report]**
 
-### Step 8: Monitor Evaluation Progress
+### Step A7: Monitor Evaluation Progress
 - **Action**: Monitor evaluation window periodically
 - **Command**:
   ```bash
@@ -177,7 +193,7 @@ Use this template for ANY remote evaluation operation:
 - **Expected**: Progress updates (loading model, inference, etc.)
 **[Monitor and report regularly]**
 
-### Step 9: Generate Evaluation Report
+### Step A8: Generate Evaluation Report
 - **Action**: Capture final evaluation results
 - **Command**:
   ```bash
@@ -185,6 +201,75 @@ Use this template for ANY remote evaluation operation:
   ```
 - **Expected**: Evaluation summary with success/failure status
 **[Run command, display report]**
+
+---
+
+## Mode B: Local Dataset Evaluation
+
+**Use this mode when**: You want to evaluate on dataset without physical robot hardware
+
+**Prerequisites**: No hardware connection required
+
+### Step B1: SSH to Jump Server
+- **Action**: Connect to jump server
+- **Command**:
+  ```bash
+  sshpass -p 'JUMP_PASS' ssh JUMP_USER@JUMP_SERVER_IP
+  ```
+- **Expected**: Successful SSH connection to jump server
+**[Run command, verify, report]**
+
+### Step B2: Verify Environment
+- **Action**: Check V2Ray status and GPU
+- **Command**:
+  ```bash
+  systemctl status v2ray --no-pager | head -5
+  nvidia-smi --query-gpu=name --format=csv,noheader
+  ```
+- **Expected**: V2Ray running, GPU detected
+**[Run commands, verify, report]**
+
+### Step B3: Navigate to lerobot_ros2 Directory
+- **Action**: Change to lerobot_ros2 directory
+- **Command**:
+  ```bash
+  cd /home/JUMP_USER/ly/lerobot_ros2
+  pwd
+  ```
+- **Expected**: In lerobot_ros2 directory
+**[Run command, verify]**
+
+### Step B4: Activate Conda Environment and Set Proxy
+- **Action**: Activate lerobot environment and configure proxy
+- **Command**:
+  ```bash
+  source /home/JUMP_USER/miniconda3/bin/activate lerobot
+  export ALL_PROXY=socks5://127.0.0.1:10808
+  ```
+- **Expected**: Conda environment activated, proxy set
+**[Run command, verify]**
+
+### Step B5: Execute Dataset Evaluation
+- **Action**: Run evaluate_dataset.py with specified parameters
+- **Command**:
+  ```bash
+  python examples/lekiwi/evaluate_dataset.py \
+    --policy_path=/home/JUMP_USER/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model \
+    --repo_id=ly/pre_training_data
+  ```
+- **Expected**: Evaluation started, processing dataset
+**[Run command, verify, report]**
+
+### Step B6: Monitor Evaluation Progress
+- **Action**: Monitor evaluation output
+- **Interval**: Report progress as it appears
+- **Expected**: Progress updates (loading model, processing episodes)
+**[Monitor and report regularly]**
+
+### Step B7: Generate Evaluation Report
+- **Action**: Capture final evaluation results
+- **Expected**: Evaluation summary with metrics (success rate, episode results)
+**[Display final results]**
 
 ---
 
@@ -210,9 +295,16 @@ This skill manages remote evaluation workflows:
 
 ### ⚠️ CRITICAL: Ask User First
 
-**DO NOT assume any values.** Always ask the user for these required parameters before executing any commands:
+**DO NOT assume any values.** Always ask the user for evaluation mode and required parameters before executing any commands:
 
-**Required questions to ask:**
+**Step 1: Ask for evaluation mode**
+1. Which evaluation mode do you want to use?
+   - **Mode A**: Real Robot Evaluation (requires hardware)
+   - **Mode B**: Local Dataset Evaluation (no hardware needed)
+
+**Step 2: Ask for required parameters based on mode**
+
+**For Mode A (Real Robot):**
 1. What is the jump server IP address? (e.g., 192.168.136.128)
 2. What is the jump server username? (e.g., nice)
 3. What is the jump server password? (e.g., NICE)
@@ -221,13 +313,20 @@ This skill manages remote evaluation workflows:
 6. What is the target robot password? (e.g., Nice@123)
 7. Is the robot hardware connected and powered? (yes/no)
 
-**Wait for user to confirm hardware is ready before proceeding to Step 2.**
+**For Mode B (Local Dataset):**
+1. What is the jump server IP address? (e.g., 192.168.136.128)
+2. What is the jump server username? (e.g., nice)
+3. What is the jump server password? (e.g., NICE)
+4. What is the model path? (policy_path, e.g., /home/nice/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model)
+5. What is the dataset ID? (repo_id, e.g., ly/pre_training_data)
 
-**Only proceed after receiving ALL answers.**
+**Wait for user to provide all answers and confirm mode before proceeding.**
 
-### Prerequisites
+---
 
-Before starting, ensure you have:
+### Mode A: Real Robot Evaluation Quick Start
+
+**Prerequisites**:
 - Jump server IP, username, password (ask user)
 - Target robot IP, username, password (ask user)
 - Conda environment with lerobot installed
@@ -282,6 +381,58 @@ tmux capture-pane -t lerobot_eval:0 -p | tail -20
 # Monitor process
 ps aux | grep "evaluate.py" | grep -v grep
 ```
+
+---
+
+### Mode B: Local Dataset Evaluation Quick Start
+
+**Prerequisites**:
+- Jump server IP, username, password (ask user)
+- Model path (policy_path)
+- Dataset ID (repo_id)
+- Conda environment with lerobot installed
+- V2Ray proxy (if HuggingFace access needed)
+- **No hardware connection required**
+
+### Step 1: SSH to Jump Server
+
+```bash
+# From your local machine
+sshpass -p 'JUMP_PASS' ssh JUMP_USER@JUMP_SERVER_IP
+```
+
+### Step 2: Navigate to lerobot_ros2 and Activate Environment
+
+```bash
+# Navigate to repository
+cd /home/JUMP_USER/ly/lerobot_ros2
+
+# Activate conda environment
+source /home/JUMP_USER/miniconda3/bin/activate lerobot
+
+# Set proxy
+export ALL_PROXY=socks5://127.0.0.1:10808
+```
+
+### Step 3: Run Dataset Evaluation
+
+```bash
+# Execute evaluation script
+python examples/lekiwi/evaluate_dataset.py \
+  --policy_path=/home/JUMP_USER/ly/lerobot_ros2/outputs/mylerobot_train/0106_smolvla_000/checkpoints/020000/pretrained_model \
+  --repo_id=ly/pre_training_data
+```
+
+**Replace placeholders with actual values**:
+- `JUMP_USER`: Jump server username (e.g., nice)
+- `policy_path`: Path to pretrained model
+- `repo_id`: HuggingFace dataset ID (e.g., ly/pre_training_data)
+
+### Step 4: Monitor Progress
+
+Evaluation will output progress directly to terminal. Wait for completion message with final metrics.
+
+---
 
 ## Configuration
 
