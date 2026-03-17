@@ -263,7 +263,8 @@ class TaskManager:
         script_file = self.tasks_dir / task_id / "run_training.sh"
         with open(script_file, 'w') as f:
             f.write("#!/bin/bash\n")
-            f.write("# Auto-generated training script\n\n")
+            f.write("# Wrapper script for lerobot_train\n")
+            f.write("# This script sets up the environment and calls the standard training script\n\n")
             
             # Conda activation
             f.write("source ~/miniconda3/etc/profile.d/conda.sh\n")
