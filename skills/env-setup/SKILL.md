@@ -591,18 +591,39 @@ All scripts are idempotent and can be safely run multiple times.
      ⚠️ **Note**: apt version (4.x) is old and may have bugs:
      - `crypto/hmac: hash generation function does not produce unique values`
      - Consider upgrading if you encounter issues
-  
-  2. **Upload from local machine**:
+
+  2. **Download from SourceForge mirror** (recommended):
+     ```bash
+     # SourceForge V2Ray project mirror
+     # Visit: https://sourceforge.net/projects/v2ray/files/
+
+     # Example: Download V2Ray 5.16.1 from SourceForge
+     wget https://downloads.sourceforge.net/project/v2ray/v2ray-linux-64.zip
+
+     # Extract and install
+     unzip v2ray-linux-64.zip -d /tmp/v2ray
+     sudo mkdir -p /usr/local/bin/v2ray
+     sudo cp /tmp/v2ray/v2ray /usr/local/bin/v2ray/
+     sudo chmod +x /usr/local/bin/v2ray/v2ray
+
+     # Download geodata files
+     wget https://downloads.sourceforge.net/project/v2ray/geoip.dat
+     wget https://downloads.sourceforge.net/project/v2ray/geosite.dat
+     sudo mkdir -p /usr/local/share/v2ray
+     sudo mv geoip.dat geosite.dat /usr/local/share/v2ray/
+     ```
+
+  3. **Upload from local machine**:
      ```bash
      # On local machine
      tar -czf v2ray-local.tar.gz /usr/local/bin/v2ray /usr/local/share/v2ray/*.dat
      scp v2ray-local.tar.gz user@remote:/tmp/
-     
+
      # On remote server
      tar -xzf /tmp/v2ray-local.tar.gz -C /
      ```
-  
-  3. **Use GitHub mirrors** (if available):
+
+  4. **Use GitHub mirrors** (if available):
      ```bash
      # Try these mirrors
      https://hub.fastgit.xyz/v2fly/v2ray-core/...
