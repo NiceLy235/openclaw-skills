@@ -19,6 +19,9 @@ source "$SCRIPT_DIR/common_utils.sh"
 # Default installation path
 INSTALL_PATH="${INSTALL_PATH:-$HOME/opt/lerobot}"
 
+# Conda environment name (unified for env-setup and lerobot-auto-train)
+CONDA_ENV_NAME="${CONDA_ENV_NAME:-lerobot}"
+
 # Repository path (for editable install)
 # If not set, will clone to ~/lerobot_ros2 or use existing
 REPO_PATH="${REPO_PATH:-}"
@@ -367,6 +370,83 @@ install_system_dependencies() {
     return 0
 }
 
+# ============================================================
+# Conda Environment Management
+# ============================================================
+
+check_conda() {
+    log INFO "Checking conda installation..."
+    
+    if ! command -v conda &> /dev/null; then
+        log ERROR "Conda is not installed!"
+        log ERROR ""
+        log ERROR "Please install Miniconda or Anaconda first:"
+        log ERROR "  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
+        log ERROR "  bash Miniconda3-latest-Linux-x86_64.sh"
+        log ERROR ""
+        log ERROR "Or install via package manager:"
+        log ERROR "  sudo apt install conda  # Ubuntu/Debian"
+        return 1
+    fi
+    
+    log SUCCESS "Conda is installed: $(conda --version)"
+    return 0
+}
+
+create_conda_env() {
+    log INFO "Creating conda environment: $CONDA_ENV_NAME"
+    
+    # Check if conda is available
+    if ! check_conda; then
+        return 1
+    fi
+    
+    # Initialize conda for current shell
+    eval "$(conda shell.bash hook 2>/dev/null)" || source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null
+    
+    # Check if environment already exists
+    if conda env list | grep -q "^${CONDA_ENV_NAME} "; then
+        log WARNING "Conda environment '$CONDA_ENV_NAME' already exists"
+        read -p "Do you want to recreate it? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            log INFO "Removing existing conda environment..."
+            conda deactivate 2>/dev/null || true
+            conda env remove -n "$CONDA_ENV_NAME" -y || true
+        else
+            log INFO "Using existing conda environment: $CONDA_ENV_NAME"
+            return 0
+        fi
+    fi
+    
+    # Create conda environment with Python 3.10
+    log INFO "Creating conda environment with Python 3.10..."
+    conda create -n "$CONDA_ENV_NAME" python=3.10 -y || {
+        log ERROR "Failed to create conda environment"
+        return 1
+    }
+    
+    log SUCCESS "Conda environment created: $CONDA_ENV_NAME"
+    return 0
+}
+
+activate_conda_env() {
+    log INFO "Activating conda environment: $CONDA_ENV_NAME"
+    
+    # Initialize conda for current shell
+    eval "$(conda shell.bash hook 2>/dev/null)" || source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null
+    
+    conda activate "$CONDA_ENV_NAME" || {
+        log ERROR "Failed to activate conda environment: $CONDA_ENV_NAME"
+        return 1
+    }
+    
+    log SUCCESS "Activated conda environment: $CONDA_ENV_NAME"
+    log INFO "Python: $(which python)"
+    log INFO "Python version: $(python --version)"
+    return 0
+}
+
 create_venv() {
     log INFO "Creating Python virtual environment..."
     
@@ -399,8 +479,7 @@ create_venv() {
 install_pytorch() {
     log INFO "Installing PyTorch with correct CUDA version..."
     
-    local venv_path="$INSTALL_PATH/venv"
-    source "$venv_path/bin/activate"
+    # Note: Conda environment should already be activated in main()
     
     # Detect CUDA version
     local cuda_version=$(detect_cuda_version)
@@ -454,8 +533,7 @@ install_pytorch() {
 install_lerobot_with_deps() {
     log INFO "Installing LeRobot with all required dependencies..."
     
-    local venv_path="$INSTALL_PATH/venv"
-    source "$venv_path/bin/activate"
+    # Note: Conda environment should already be activated in main()
     
     # Configure repository (clone or use existing)
     local repo_path
@@ -642,19 +720,22 @@ create_activation_script() {
         }
     fi
     
-    cat > "$activate_script" << ACTIVATE_EOF
+    cat > "$activate_script" << 'ACTIVATE_EOF'
 #!/bin/bash
-# LeRobot activation script with workspace configuration
+# LeRobot activation script with conda environment
 
-VENV_PATH="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)/venv"
-WORKSPACE_PATH="$repo_path"
+CONDA_ENV_NAME="lerobot"
+WORKSPACE_PATH="__REPO_PATH__"
 
-if [ ! -d "\$VENV_PATH" ]; then
-    echo "Error: Virtual environment not found at \$VENV_PATH"
+# Initialize conda
+eval "$(conda shell.bash hook 2>/dev/null)" || source "$(conda info --base)/etc/profile.d/conda.sh" 2>/dev/null
+
+# Activate conda environment
+conda activate "$CONDA_ENV_NAME" || {
+    echo "Error: Failed to activate conda environment: $CONDA_ENV_NAME"
+    echo "Please ensure the environment exists: conda env list"
     exit 1
-fi
-
-source "\$VENV_PATH/bin/activate"
+}
 
 # Configure proxy if V2Ray is running
 if ss -tlnp 2>/dev/null | grep -q ":10809"; then
@@ -665,14 +746,15 @@ if ss -tlnp 2>/dev/null | grep -q ":10809"; then
 fi
 
 # Set workspace directory and cd to it
-if [ -n "\$WORKSPACE_PATH" ] && [ -d "\$WORKSPACE_PATH" ]; then
-    export LEROBOT_WORKSPACE="\$WORKSPACE_PATH"
-    cd "\$WORKSPACE_PATH"
+if [ -n "$WORKSPACE_PATH" ] && [ -d "$WORKSPACE_PATH" ]; then
+    export LEROBOT_WORKSPACE="$WORKSPACE_PATH"
+    cd "$WORKSPACE_PATH"
 fi
 
 echo "✓ LeRobot environment activated!"
 echo ""
-echo "Python:   \$(which python3)"
+echo "Conda Env: $CONDA_ENV_NAME"
+echo "Python:   $(which python3)"
 python3 << 'PYINFO'
 import torch
 try:
@@ -692,6 +774,13 @@ if [ -n "\$WORKSPACE_PATH" ]; then
     echo "  python -m lerobot.scripts.lerobot_replay --help"
 fi
 ACTIVATE_EOF
+    
+    # Replace placeholder with actual repo path
+    if [ -n "$repo_path" ]; then
+        sed -i "s|__REPO_PATH__|$repo_path|g" "$activate_script"
+    else
+        sed -i 's|WORKSPACE_PATH="__REPO_PATH__"|WORKSPACE_PATH=""|g' "$activate_script"
+    fi
     
     chmod +x "$activate_script"
     
@@ -753,17 +842,18 @@ main() {
         exit 1
     fi
     
-    # Step 4: Create virtual environment
-    update_progress "Creating Virtual Environment" "running"
-    if create_venv; then
-        update_progress "Creating Virtual Environment" "success"
+    # Step 4: Create conda environment
+    update_progress "Creating Conda Environment" "running"
+    if create_conda_env; then
+        update_progress "Creating Conda Environment" "success"
     else
-        update_progress "Creating Virtual Environment" "error"
+        update_progress "Creating Conda Environment" "error"
         exit 1
     fi
     
     # Step 5: Install PyTorch
     update_progress "Installing PyTorch (CUDA-aware)" "running"
+    activate_conda_env || exit 1
     if install_pytorch; then
         update_progress "Installing PyTorch (CUDA-aware)" "success"
     else
@@ -784,7 +874,7 @@ main() {
     update_progress "Verifying Installation" "running"
     local verify_failed=0
     
-    source "$INSTALL_PATH/venv/bin/activate"
+    # Conda environment should already be activated
     
     if ! verify_pytorch_torchvision; then
         verify_failed=1

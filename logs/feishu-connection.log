@@ -1,0 +1,10 @@
+# 飞书连接状态监控日志
+
+## 2026-03-13 17:06:00 (Asia/Shanghai)
+**状态**: ❌ 连接失败  
+**错误**: Feishu credentials not configured for account "default"  
+**检查项**: App Scopes (应用权限检查)  
+**结论**: 飞书 API 凭证未配置，无法建立连接
+
+---
+

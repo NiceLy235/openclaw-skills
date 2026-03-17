@@ -11,13 +11,91 @@ description: >
   "推理测试", "启动训练", "进行训练", "运行训练", "模型训练". **CRITICAL: When user
   mentions any training-related keywords, MUST activate this skill FIRST instead
   of manually executing commands.**
+
+  MANDATORY: Execute steps in strict order. Stop on any error.
+metadata:
+  {
+    "openclaw": {
+      "emoji": "🤖"
+    }
+  }
 ---
 
 # Lerobot Auto Train
 
 自动化完整训练流程：数据准备 → 数据集合并 → 训练 → 验证 → 推理测试
 
-**核心功能**:
+⚠️ **CRITICAL: Execute steps in strict order as listed below. Do NOT skip any step.**
+
+---
+
+## MANDATORY Execution Rules
+
+1. **Execute steps sequentially** - Complete Step 1 before starting Step 2
+2. **Report progress after EACH step** - Inform user of completion before proceeding
+3. **Do NOT skip verification steps** - Always verify dataset exists before training
+4. **Stop on error** - If any step fails, report the error and STOP. Do NOT proceed with remaining steps
+5. **Require user confirmation** - MUST get user confirmation before submitting training task
+6. **Monitor training progress** - Report training progress every 30 seconds
+
+---
+
+## Progress Reporting Rules
+
+1. **Start each step** with: `### Step X: [Name]`
+2. **After each step**, report: `✅ Step X completed: [summary]`
+3. **If a step fails**, report: `❌ Step X failed: [error details]`
+4. **Before next step**, indicate: `→ Proceeding to Step X+1...`
+5. **During training**, report: `📊 训练进度：[current]/[total] (loss: [value])`
+
+---
+
+## Error Handling
+
+### Step Failure Protocol
+
+**When a step fails:**
+
+1. **Immediately report error:**
+   ```
+   ❌ 步骤 X 失败：[具体错误信息]
+   错误详情：[command output]
+   ```
+
+2. **Attempt recovery (if applicable):**
+   ```
+   🔧 正在尝试恢复...
+   恢复方案：[description]
+   ```
+
+3. **If recovery succeeds:**
+   ```
+   ✅ 恢复成功，继续执行
+   ```
+
+4. **If recovery fails or not applicable:**
+   ```
+   ❌ 无法恢复，停止训练
+   已完成步骤：X-1
+   失败步骤：X
+   ```
+
+### Error Recovery Strategies
+
+| Error Type | Recovery Strategy |
+|------------|------------------|
+| lerobot_ros2 repository not found | Run `env-setup` skill to install lerobot first |
+| Training script not found | Verify repository integrity, re-clone if needed |
+| Dataset not found | Check `--dataset-repo-id`, verify dataset exists |
+| CUDA OOM | Reduce `--batch-size` and retry |
+| HuggingFace inaccessible | Check proxy configuration, verify V2Ray running |
+| Conda environment not found | Verify conda environment name, create if needed |
+| Disk space full | Clean up checkpoints and retry |
+
+---
+
+## Core Features
+
 - ✅ 使用 `lerobot_edit_dataset` 合并数据集
 - ✅ 使用 `lerobot_train` 进行训练
 - ✅ 后台执行（不阻塞）
@@ -25,6 +103,149 @@ description: >
 - ✅ 代理和 HuggingFace Token 配置
 - ✅ 自动验证和恢复
 - ⚠️ **训练前必须确认参数**（见下方流程）
+
+---
+
+## Step-by-Step Execution Template
+
+Use this template for ANY training operation:
+
+### Step 1: Pre-flight Checks
+- **Action**: Verify lerobot_ros2 repository (installed by env-setup skill), conda environment and GPU availability
+- **Command**:
+  ```bash
+  # 1.1 Check lerobot_ros2 repository location (env-setup installs to ~/lerobot_ros2)
+  LEROBOT_DIR=""
+  if [ -d ~/lerobot_ros2 ]; then
+    LEROBOT_DIR=~/lerobot_ros2
+    echo "✅ lerobot_ros2 仓库存在: ~/lerobot_ros2"
+  elif [ -d /root/lerobot_ros2 ]; then
+    LEROBOT_DIR=/root/lerobot_ros2
+    echo "✅ lerobot_ros2 仓库存在: /root/lerobot_ros2"
+  else
+    echo "❌ lerobot_ros2 仓库不存在"
+  fi
+
+  # 1.2 Check training script exists (lerobot_train.py is inside lerobot_ros2 repo)
+  if [ -n "$LEROBOT_DIR" ]; then
+    test -f $LEROBOT_DIR/src/lerobot/scripts/lerobot_train.py && \
+      echo "✅ 训练脚本存在: $LEROBOT_DIR/src/lerobot/scripts/lerobot_train.py" || \
+      echo "❌ 训练脚本不存在"
+  fi
+
+  # 1.3 Check conda environment (default: lerobot, created by env-setup skill)
+  CONDA_ENV_NAME="${CONDA_ENV_NAME:-lerobot}"
+  conda env list | grep -q "^${CONDA_ENV_NAME} " && \
+    echo "✅ Conda 环境存在: $CONDA_ENV_NAME" || \
+    echo "❌ Conda 环境不存在: $CONDA_ENV_NAME (请先运行 env-setup skill)"
+
+  # 1.4 Check GPU
+  nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || echo "❌ 无 GPU"
+
+  # 1.5 Check lerobot import (must run from lerobot_ros2 directory)
+  cd $LEROBOT_DIR 2>/dev/null && conda activate $CONDA_ENV_NAME && \
+    python -c "import lerobot; print(f'LeRobot: {lerobot.__version__}')" || \
+    echo "❌ lerobot 无法导入"
+  ```
+- **Expected**:
+  - ✅ `lerobot_ros2` 仓库存在于 `~/lerobot_ros2` 或 `/root/lerobot_ros2`
+  - ✅ 训练脚本存在于 `<repo>/src/lerobot/scripts/lerobot_train.py`
+  - ✅ Conda environment `lerobot` exists (created by env-setup)
+  - ✅ CUDA available, GPU memory reported
+  - ✅ LeRobot can be imported (when running from repo directory)
+- **If Failed**:
+  - If repository not found: Run `env-setup` skill first to install lerobot
+  - If training script missing: Re-clone repository
+  - If conda env not found: Run `env-setup` skill to create environment
+  - If no GPU: Training requires GPU, cannot proceed
+**[Run command and report output]**
+
+### Step 2: Collect User Requirements
+- **Action**: Ask user for training parameters
+- **Required inputs**:
+  - Model name (default: smolvla_base)
+  - Dataset path or repo_id
+  - Batch size, steps, save_freq
+  - Proxy and HuggingFace token
+- **Expected**: All required parameters provided
+**[Ask user, verify inputs]**
+
+### Step 3: Prepare Dataset
+- **Action**: Merge episodes into training dataset
+- **Command**:
+  ```bash
+  python scripts/prepare_dataset.py full \
+    --data-dir /path/to/data \
+    --repo-prefix ly \
+    --proxy http://127.0.0.1:10809
+  ```
+- **Expected**: Dataset merged successfully, repo_id returned
+**[Run command, verify, report]**
+
+### Step 4: Generate Configuration Preview
+- **Action**: Generate complete training configuration
+- **Command**:
+  ```bash
+  python scripts/task_manager.py submit \
+    --dataset-repo-id ly/merged \
+    --model-name smolvla_base \
+    --batch-size 32 \
+    --steps 100000 \
+    --dry-run
+  ```
+- **Expected**: Full configuration displayed
+**[Run command, display config to user]**
+
+### Step 5: Wait for User Confirmation
+- **Action**: Present configuration and ask for confirmation
+- **Message**:
+  ```
+  📋 训练配置预览
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  [Full configuration details]
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  确认启动训练？(yes/no)
+  ```
+- **Required**: User must respond "yes" or "确认"
+**[Wait for user response]**
+
+### Step 6: Submit Training Task
+- **Action**: Submit training task (only after user confirmation)
+- **Command**:
+  ```bash
+  python scripts/task_manager.py submit \
+    --dataset-repo-id ly/merged \
+    --model-name smolvla_base \
+    --batch-size 32 \
+    --steps 100000 \
+    --proxy http://127.0.0.1:10809 \
+    --hf-token YOUR_TOKEN
+  ```
+- **Expected**: Task ID returned, training started
+**[Run command, verify, report task ID]**
+
+### Step 7: Monitor Training Progress
+- **Action**: Monitor training progress in real-time
+- **Command**:
+  ```bash
+  python scripts/task_manager.py status <task_id>
+  ```
+- **Interval**: Report every 30 seconds
+- **Expected**: Progress updates (current_step, loss, lr)
+**[Monitor and report regularly]**
+
+### Step 8: Generate Training Report
+- **Action**: Generate final training report
+- **Command**:
+  ```bash
+  python scripts/task_manager.py logs <task_id> --tail 100
+  ```
+- **Expected**: Training summary with final metrics
+**[Run command, display report]**
+
+---
 
 ## ⚠️ 训练前确认流程（强制）
 
@@ -78,7 +299,7 @@ python scripts/task_manager.py submit \
 
 💻 执行环境:
   • 脚本位置: /home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_train.py
-  • Conda 环境: ly_robot
+  • Conda 环境: lerobot
   • 设备: cuda
   • 输出目录: outputs/mylerobot_train/0313_1052
 
@@ -136,7 +357,7 @@ python scripts/task_manager.py submit \
 ```bash
 # 确保已安装
 cd /path/to/lerobot_ros2
-conda activate ly_robot
+conda activate lerobot
 ```
 
 ## 快速开始
@@ -228,7 +449,7 @@ python scripts/task_manager.py logs <task_id>
 | `--episodes-dir` | episodes 目录 | 必填 |
 | `--repo-id` | 合并后的 repo ID | 必填 |
 | `--proxy` | 代理 URL | 无 |
-| `--conda-env` | Conda 环境名 | ly_robot |
+| `--conda-env` | Conda 环境名 | lerobot |
 
 #### full 命令
 
@@ -237,7 +458,7 @@ python scripts/task_manager.py logs <task_id>
 | `--data-dir` | 原始数据目录 | 必填 |
 | `--repo-prefix` | repo ID 前缀 | ly |
 | `--proxy` | 代理 URL | 无 |
-| `--conda-env` | Conda 环境名 | ly_robot |
+| `--conda-env` | Conda 环境名 | lerobot |
 
 ### task_manager.py submit
 
@@ -253,6 +474,7 @@ python scripts/task_manager.py logs <task_id>
 | `--num-workers` | 数据加载器 workers | 16 |
 | `--proxy` | 代理 URL | 无 |
 | `--hf-token` | HuggingFace Token | 无 |
+| `--conda-env` | Conda 环境名 | lerobot |
 | `--background` | 后台运行 | True |
 
 ## 示例会话
@@ -306,7 +528,7 @@ $ python scripts/task_manager.py submit \
 
 💻 执行环境:
   • 脚本位置: /home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_train.py
-  • Conda 环境: ly_robot
+  • Conda 环境: lerobot
   • 设备: cuda
   • 输出目录: outputs/mylerobot_train/0313_1052
 

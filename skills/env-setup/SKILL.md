@@ -5,15 +5,71 @@ description: >
   conflict resolution and proxy configuration. Supports v2ray proxy and lerobot
   robot learning framework. Enhanced version handles PyTorch/torchvision version
   mismatches, dependency conflicts, and network proxy setup automatically.
-  
+
   Use when: (1) Setting up a new development machine, (2) Installing v2ray for
   network proxy, (3) Installing lerobot for robot learning, (4) Fixing dependency
   conflicts, (5) Configuring proxy for HuggingFace access, (6) User mentions
   'setup environment', 'install v2ray', 'install lerobot', 'fix dependencies',
   or asks to configure development tools.
+metadata:
+  {
+    "openclaw": {
+      "emoji": "🔧"
+    }
+  }
 ---
 
 # Environment Setup Skill
+
+⚠️ **CRITICAL: Execute steps in strict order as listed below. Do NOT skip any step.**
+
+---
+
+## MANDATORY Execution Rules
+
+1. **Execute steps sequentially** - Complete Step 1 before starting Step 2
+2. **Report progress after EACH step** - Inform user of completion before proceeding
+3. **Do NOT skip verification steps** - Always run tests/checks as specified
+4. **Stop on error** - If any step fails, report the error and stop
+
+---
+
+# Installation Workflow
+
+## Standard Execution Pattern
+
+When executing any installation or task, follow this pattern:
+
+### Step-by-Step Execution Template
+
+```markdown
+## Executing Installation Task
+
+### Step 1: [Task Name]
+- **Action**: [What you're doing]
+- **Command**: [Exact command to run]
+- **Expected**: [What should happen]
+**[Run command and report output]**
+
+### Step 2: [Verification]
+- **Check**: [What to verify]
+- **Expected**: [Success criteria]
+**[Run verification and report result]**
+
+### Step 3: [Next Task]
+...
+```
+
+### Progress Reporting Rules
+
+1. **Start each step** with: `### Step X: [Name]`
+2. **After each step**, report: `✅ Step X completed: [summary]`
+3. **If a step fails**, report: `❌ Step X failed: [error details]`
+4. **Before next step**, ask: `Proceeding to Step X+1...`
+
+---
+
+# Installation Workflow
 
 Automate the installation and configuration of development environments on Ubuntu/Debian/macOS systems.
 
@@ -176,37 +232,68 @@ Each installation follows these steps with **real-time progress display**:
 - If not, installation will STOP with error message
 - You must run V2Ray installation and testing first
 
-1. **V2Ray Verification**
-   - Check if V2Ray config exists
-   - Check if proxy tests have passed
-   - Stop if not satisfied
+#### Step 1: V2Ray Verification
+```bash
+# Action: Verify V2Ray is configured and tested
+# Command:
+test -f /usr/local/etc/v2ray/config.json && bash scripts/test_proxy.sh
+# Expected: V2Ray config exists and all proxy tests pass
+# If failed: STOP and report error. Do NOT proceed to Step 2.
+```
 
-2. **Environment Detection**
-   - Check OS version and architecture
-   - Verify disk space (minimum 2GB)
-   - Detect existing installations
+#### Step 2: Environment Detection
+```bash
+# Action: Check system requirements
+# Command:
+bash scripts/check_environment.sh lerobot
+# Expected: System meets minimum requirements
+# If failed: Report missing requirements and suggest fixes
+```
 
-3. **CUDA Detection** (Enhanced!)
-   - Auto-detect CUDA version
-   - Map to correct PyTorch index
-   - Verify GPU functionality
+#### Step 3: CUDA Detection
+```bash
+# Action: Detect CUDA version and GPU availability
+# Command:
+nvidia-smi --query-gpu=name,driver_version,cuda_version --format=csv,noheader || echo "No GPU detected"
+# Expected: CUDA version reported or "No GPU detected"
+# Note: Report detected version before proceeding
+```
 
-4. **Smart Dependency Installation** (Enhanced!)
-   - Install required system packages
-   - Set up Python environment (for lerobot)
-   - Install PyTorch with correct CUDA version
-   - Resolve version conflicts automatically
+#### Step 4: Smart Dependency Installation
+```bash
+# Action: Install PyTorch with correct CUDA version and resolve conflicts
+# Command:
+bash scripts/install_lerobot_enhanced.sh
+# Expected: Dependencies installed, PyTorch version matched to CUDA
+# Progress: Monitor and report script output every 30 seconds
+```
 
-5. **Main Program Installation**
-   - Download and install the software
-   - Install all required dependencies
-   - Handle version constraints
+#### Step 5: Main Program Installation
+```bash
+# Action: Clone and install LeRobot from openeuler repository
+# Command: (executed as part of install_lerobot_enhanced.sh)
 
-6. **Comprehensive Verification** (Enhanced!)
-   - Test PyTorch/torchvision compatibility
-   - Verify all imports
-   - Test CUDA operations
-   - Generate installation report
+# Step 5.1: Clone repository
+git clone https://gitcode.com/openeuler/lerobot_ros2 ~/lerobot_ros2
+
+# Step 5.2: Install in editable mode
+cd ~/lerobot_ros2 && pip install -e .
+
+# Expected: LeRobot installed successfully from openeuler repository
+# Note: This repository contains customized lerobot with modifications
+# If failed: Report specific error and retry with --fix flag
+```
+
+#### Step 6: Comprehensive Verification
+```bash
+# Action: Verify installation and test functionality
+# Command:
+source ~/opt/lerobot/activate.sh
+python3 -c "import lerobot; print(lerobot.__version__)"
+python3 -c "import torch; print(f'CUDA: {torch.cuda.is_available()}')"
+# Expected: All imports work, CUDA status reported
+# Report: Final installation summary
+```
 
 ### Progress Display Features
 
@@ -238,32 +325,42 @@ Status: ⏳ running
 |-----------|------|----------|---------|-------------|
 | env_type | string | Yes | - | Environment type: `v2ray` or `lerobot` |
 | INSTALL_PATH | string | No | `~/opt/<env>` | Installation directory (set as environment variable) |
-| REPO_PATH | string | No | Auto-detect | LeRobot repository path (for editable install) |
-| REPO_URL | string | No | huggingface/lerobot | Git repository URL for cloning |
+| CONDA_ENV_NAME | string | No | `lerobot` | Conda environment name (unified for env-setup and lerobot-auto-train) |
+| REPO_PATH | string | No | `~/lerobot_ros2` | LeRobot repository path (for editable install) |
+| REPO_URL | string | No | `https://gitcode.com/openeuler/lerobot_ros2` | Git repository URL for cloning (openeuler customized version) |
 
 Example with custom paths:
 ```bash
 # Install v2ray with custom path
 INSTALL_PATH=~/custom/path bash scripts/install_v2ray.sh
 
-# Install lerobot with existing repository
+# Install lerobot with custom conda environment name
+CONDA_ENV_NAME=my_lerobot bash scripts/install_lerobot_enhanced.sh
+
+# Install lerobot with existing repository (if already cloned)
 REPO_PATH=/home/nice/data/lerobot_ros2 bash scripts/install_lerobot_enhanced.sh
 
-# Install lerobot with custom clone URL (for forks)
-REPO_URL=https://github.com/yourfork/lerobot.git bash scripts/install_lerobot_enhanced.sh
+# Note: Default repository is https://gitcode.com/openeuler/lerobot_ros2
+# This repository contains customized lerobot with modifications
 ```
 
 ### Repository Configuration (LeRobot)
 
-LeRobot is installed in **editable mode** (`pip install -e .`) to allow:
+LeRobot is installed from **openeuler customized repository** in **editable mode** (`pip install -e .`) to allow:
 - ✅ Using scripts from the workspace directory
+- ✅ Using customized lerobot with modifications from openeuler
 - ✅ Modifying source code without reinstalling
 - ✅ Running `python -m lerobot.scripts.*` commands
 
+**Default Repository:**
+- URL: `https://gitcode.com/openeuler/lerobot_ros2`
+- Contains customized lerobot with openeuler modifications
+- Always clone from this repository (not from huggingface/lerobot)
+
 **Auto-Detection Order:**
 1. `REPO_PATH` environment variable (if set)
-2. Existing directories: `~/lerobot_ros2`, `~/lerobot`, `/home/nice/data/lerobot_ros2`, etc.
-3. Clone to `~/lerobot_ros2` if no existing repo found
+2. Existing directory: `~/lerobot_ros2`
+3. Clone from `https://gitcode.com/openeuler/lerobot_ros2` to `~/lerobot_ros2`
 
 ## Output
 
@@ -381,10 +478,13 @@ source ~/.bashrc
 source ~/opt/lerobot/activate.sh
 
 # This will:
-# 1. Activate virtual environment
+# 1. Activate conda environment (default: lerobot)
 # 2. Configure V2Ray proxy (if running)
 # 3. Change to workspace directory
 # 4. Set LEROBOT_WORKSPACE environment variable
+
+# Or manually activate conda environment:
+conda activate lerobot
 
 # Verify installation
 python3 -c "import lerobot; print(lerobot.__version__)"

@@ -7,11 +7,186 @@ description: >
   (4) Setting up persistent terminal sessions for long-running evaluation tasks, (5) User mentions
   "remote evaluation", "jump server", "tmux", "lerobot evaluate", "robot testing".
   Trigger phrases: "remote evaluation", "通过跳板机评估", "远程机器人测试", "tmux session".
+
+  MANDATORY: Execute steps in strict order. Stop on any error.
+metadata:
+  {
+    "openclaw": {
+      "emoji": "🔌"
+    }
+  }
 ---
 
 # Remote Lerobot Evaluation
 
 Execute and monitor lerobot evaluation tasks on remote machines via jump server with persistent terminal sessions.
+
+⚠️ **CRITICAL: Execute steps in strict order as listed below. Do NOT skip any step.**
+
+---
+
+## MANDATORY Execution Rules
+
+1. **Execute steps sequentially** - Complete Step 1 before starting Step 2
+2. **Report progress after EACH step** - Inform user of completion before proceeding
+3. **Do NOT skip verification steps** - Always verify tmux session and robot connection
+4. **Stop on error** - If any step fails, report the error and STOP. Do NOT proceed with remaining steps
+5. **Require user confirmation** - MUST confirm hardware is ready before starting
+6. **Monitor evaluation progress** - Report progress every 30 seconds during evaluation
+
+---
+
+## Progress Reporting Rules
+
+1. **Start each step** with: `### Step X: [Name]`
+2. **After each step**, report: `✅ Step X completed: [summary]`
+3. **If a step fails**, report: `❌ Step X failed: [error details]`
+4. **Before next step**, indicate: `→ Proceeding to Step X+1...`
+5. **During evaluation**, report: `📊 评估进度：[status]`
+
+---
+
+## Error Handling
+
+### Step Failure Protocol
+
+**When a step fails:**
+
+1. **Immediately report error:**
+   ```
+   ❌ 步骤 X 失败：[具体错误信息]
+   错误详情：[command output]
+   ```
+
+2. **Attempt recovery (if applicable):**
+   ```
+   🔧 正在尝试恢复...
+   恢复方案：[description]
+   ```
+
+3. **If recovery succeeds:**
+   ```
+   ✅ 恢复成功，继续执行
+   ```
+
+4. **If recovery fails or not applicable:**
+   ```
+   ❌ 无法恢复，停止评估
+   已完成步骤：X-1
+   失败步骤：X
+   ```
+
+### Error Recovery Strategies
+
+| Error Type | Recovery Strategy |
+|------------|------------------|
+| SSH connection failed | Check network, verify credentials, retry |
+| tmux session not created | Install tmux, check permissions, retry |
+| Robot hardware not connected | STOP - require user to connect hardware |
+| Motor connection failed | Check hardware connection, restart cmd.sh |
+| HuggingFace inaccessible | Check proxy configuration, verify V2Ray running |
+| No X11 display | Set DISPLAY environment or use headless mode |
+
+---
+
+## Step-by-Step Execution Template
+
+Use this template for ANY remote evaluation operation:
+
+### Step 1: Collect Required Parameters
+- **Action**: Ask user for all required connection parameters
+- **Required inputs**:
+  - Jump server IP, username, password
+  - Target robot IP, username, password
+  - Model path, dataset ID
+  - Confirmation that hardware is connected and powered
+- **Expected**: All required parameters provided
+**[Ask user, verify all inputs]**
+
+### Step 2: SSH to Jump Server
+- **Action**: Connect to jump server
+- **Command**:
+  ```bash
+  sshpass -p 'JUMP_PASS' ssh JUMP_USER@JUMP_SERVER_IP
+  ```
+- **Expected**: Successful SSH connection to jump server
+**[Run command, verify, report]**
+
+### Step 3: Verify Environment
+- **Action**: Check tmux installation and V2Ray status
+- **Command**:
+  ```bash
+  which tmux
+  systemctl status v2ray --no-pager | head -5
+  nvidia-smi --query-gpu=name --format=csv,noheader
+  ```
+- **Expected**: tmux installed, V2Ray running, GPU detected
+**[Run commands, verify, report]**
+
+### Step 4: Test Robot Connectivity
+- **Action**: Verify connection to target robot
+- **Command**:
+  ```bash
+  sshpass -p 'TARGET_PASS' ssh TARGET_USER@TARGET_IP 'hostname'
+  ```
+- **Expected**: Robot hostname returned
+**[Run command, verify, report]**
+
+### Step 5: Initialize tmux Session
+- **Action**: Create tmux session for evaluation
+- **Command**:
+  ```bash
+  tmux kill-session -t lerobot_eval 2>/dev/null
+  tmux new-session -d -s lerobot_eval -x 240 -y 60
+  tmux list-sessions
+  ```
+- **Expected**: tmux session created successfully
+**[Run command, verify, report]**
+
+### Step 6: Start Robot Host (Window 0)
+- **Action**: SSH to robot and start cmd.sh
+- **Command**:
+  ```bash
+  tmux send-keys -t lerobot_eval:0 "sshpass -p 'TARGET_PASS' ssh -t -o StrictHostKeyChecking=no -X TARGET_USER@TARGET_IP \"source /root/miniconda3/bin/activate && cd /root/workspace/lerobot_ros2 && bash cmd.sh\"" Enter
+  sleep 5
+  tmux send-keys -t lerobot_eval:0 "Enter"
+  ```
+- **Expected**: Robot host started, showing "No command available"
+**[Run command, verify, report]**
+
+### Step 7: Start Evaluation Script (Window 1)
+- **Action**: Clear dataset cache and start evaluation
+- **Command**:
+  ```bash
+  tmux new-window -t lerobot_eval -n evaluate
+  tmux send-keys -t lerobot_eval:1 "rm -rf /home/JUMP_USER/.cache/huggingface/lerobot/ly/eval_dataset" Enter
+  sleep 2
+  tmux send-keys -t lerobot_eval:1 "source /home/JUMP_USER/miniconda3/bin/activate lerobot && export ALL_PROXY=socks5://127.0.0.1:10808 && export DISPLAY=:0 && cd /home/JUMP_USER/ly/lerobot_ros2 && python examples/lekiwi/evaluate.py --id=lekiwi --remote_ip=TARGET_IP --hf_model_id=MODEL_PATH --hf_dataset_id=DATASET_ID --is_headless_flag=False" Enter
+  ```
+- **Expected**: Evaluation script started, loading model
+**[Run command, verify, report]**
+
+### Step 8: Monitor Evaluation Progress
+- **Action**: Monitor evaluation window periodically
+- **Command**:
+  ```bash
+  tmux capture-pane -t lerobot_eval:1 -p | tail -30
+  ps aux | grep "evaluate.py" | grep -v grep
+  ```
+- **Interval**: Report every 30 seconds
+- **Expected**: Progress updates (loading model, inference, etc.)
+**[Monitor and report regularly]**
+
+### Step 9: Generate Evaluation Report
+- **Action**: Capture final evaluation results
+- **Command**:
+  ```bash
+  tmux capture-pane -t lerobot_eval:1 -p | tail -100
+  ```
+- **Expected**: Evaluation summary with success/failure status
+**[Run command, display report]**
+
+---
 
 ## Use Case
 

@@ -1,0 +1,150 @@
+================================================================================
+ Skill Steps Detailed Analysis Report
+================================================================================
+
+📋 env-setup
+--------------------------------------------------------------------------------
+📌 Execution Rules:
+  ✅ Has MANDATORY/CRITICAL section
+  ✅ Sequential execution required
+  ✅ Progress reporting required
+  ✅ Verification steps required
+  ✅ Stop on error rule
+  ❌ User confirmation required
+
+📊 Steps Found: 40
+  1. [Task Name]
+  1. Install V2Ray
+  1. V2Ray Verification
+  1. Execute steps sequentially
+  1. Start each step
+  1. Environment Check
+  1. Always check logs
+  1. Install PySocks
+  1. Add to PYTHONPATH
+  1. No systemd
+  2. [Verification]
+  2. Test proxy connectivity (MANDATORY)
+  2. Environment Detection
+  2. Report progress after EACH step
+  2. After each step
+  2. Install V2Ray Core
+  2. Verify environment
+  2. Use HTTP proxy instead
+  2. Make permanent
+  2. Limited disk space
+  3. [Next Task]
+  3. Only then install other components
+  3. CUDA Detection
+  3. Do NOT skip verification steps
+  3. If a step fails
+  3. Configure Proxy
+  3. Use custom paths
+  3. Don't use proxy if server can access directly
+  3. Use correct import path
+  3. Network restrictions
+  4. Smart Dependency Installation
+  4. Stop on error
+  4. Before next step
+  4. Start Service
+  4. Only then
+  4. Review configuration
+  4. Persistent storage
+  5. Main Program Installation
+  5. Test Connectivity
+  6. Comprehensive Verification
+
+
+📋 feishu-realtime
+--------------------------------------------------------------------------------
+📌 Execution Rules:
+  ✅ Has MANDATORY/CRITICAL section
+  ❌ Sequential execution required
+  ✅ Progress reporting required
+  ❌ Verification steps required
+  ❌ Stop on error rule
+  ❌ User confirmation required
+
+📊 Steps Found: 8
+  1. Immediate Start Notification
+  1. NEVER execute >3 Feishu API calls without at least one progress message
+  2. Execute First Operation
+  2. ALWAYS send start message before first API call
+  3. Execute Subsequent Operations
+  3. ALWAYS send completion message after last API call
+  4. Final Completion
+  4. ALWAYS report errors immediately with recovery attempt
+
+
+📋 github-sync
+--------------------------------------------------------------------------------
+📌 Execution Rules:
+  ❌ Has MANDATORY/CRITICAL section
+  ❌ Sequential execution required
+  ❌ Progress reporting required
+  ❌ Verification steps required
+  ❌ Stop on error rule
+  ❌ User confirmation required
+
+📊 Steps Found: 5
+  1. Check V2Ray before sync
+  2. Review changes before sync
+  3. Regular backups
+  4. Monitor sync logs
+  5. After updating ANY skill, sync to GitHub
+
+
+📋 lerobot-auto-train
+--------------------------------------------------------------------------------
+📌 Execution Rules:
+  ❌ Has MANDATORY/CRITICAL section
+  ❌ Sequential execution required
+  ❌ Progress reporting required
+  ✅ Verification steps required
+  ❌ Stop on error rule
+  ✅ User confirmation required
+
+📊 Steps Found: 11
+  1. 收集用户需求
+  1. Collecting episodes...
+  1. 模型选择
+  2. 生成配置预览
+  2. Merging all episodes into single dataset...
+  2. 训练参数
+  3. 展示给用户
+  3. 数据集
+  4. 等待用户确认
+  4. 其他配置
+  5. 提交任务
+
+
+📋 remote-lerobot-eval
+--------------------------------------------------------------------------------
+📌 Execution Rules:
+  ❌ Has MANDATORY/CRITICAL section
+  ❌ Sequential execution required
+  ❌ Progress reporting required
+  ❌ Verification steps required
+  ❌ Stop on error rule
+  ✅ User confirmation required
+
+📊 Steps Found: 10
+  1. Initialize Session
+  1. Create session
+  1. Robot Host (Window 0):
+  2. Start Robot Host (Window 0)
+  2. Start robot host (replace TARGET_PASS, TARGET_USER, TARGET_IP)
+  2. Evaluation Script (Window 1):
+  3. Start Evaluation Script (Window 1)
+  3. Start evaluation (replace TARGET_IP, JUMP_USER paths)
+  4. Monitor Progress
+  4. Monitor
+
+
+================================================================================
+ Summary
+================================================================================
+Total Skills: 5
+Skills with Steps: 5/5
+Skills with MANDATORY Rules: 2/5
+Skills with Stop-on-Error: 1/5
