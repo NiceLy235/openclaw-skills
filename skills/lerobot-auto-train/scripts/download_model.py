@@ -219,7 +219,9 @@ def main():
     
     # Strategy 1: Try GitCode first
     if not args.skip_gitcode:
-        if download_from_gitcode(args.repo_id, cache_dir, timeout=min(args.timeout, 120), proxy=args.proxy):
+        # Use full timeout for GitCode (can be large files)
+        gitcode_timeout = args.timeout
+        if download_from_gitcode(args.repo_id, cache_dir, timeout=gitcode_timeout, proxy=args.proxy):
             elapsed = time.time() - start_time
             print(f"\n✅ Model downloaded successfully from GitCode")
             print(f"   Time: {elapsed:.1f}s")
