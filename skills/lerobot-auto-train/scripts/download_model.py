@@ -1,185 +1,231 @@
 #!/usr/bin/env python3
 """
-Download models from HuggingFace with automatic mirror fallback.
-
-Usage:
-    python download_model.py --repo-id lerobot/smolvla_base --proxy http://127.0.0.1:10809
-
-Features:
-- First try huggingface.co
-- If failed or timeout, fallback to hf-mirror.com
-- Support proxy configuration
-- Progress tracking
+Download models from GitCode or HuggingFace with automatic fallback.
+Priority: GitCode → huggingface.co → hf-mirror.com
 """
 
 import argparse
 import os
 import subprocess
 import sys
+import tarfile
 import time
 from pathlib import Path
+from urllib.parse import quote
+
+# GitCode configuration
+GITCODE_BASE_URL = "https://gitcode.com/nicely235/place/-/raw/main"
+GITCODE_MODELS = {
+    "lerobot/smolvla_base": "models--lerobot--smolvla_base.tar.gz",
+    "lerobot/pi05_base": "models--lerobot--pi05_base.tar.gz",
+    "google/paligemma-3b-pt-224": "models--google--paligemma-3b-pt-224.tar.gz",
+}
+
+# HuggingFace mirrors
+HF_MIRRORS = ["huggingface.co", "hf-mirror.com"]
+
+# Cache directory
+DEFAULT_CACHE_DIR = Path.home() / ".cache" / "huggingface" / "hub"
 
 
-def download_from_huggingface(
-    repo_id: str,
-    proxy: str = None,
-    hf_token: str = None,
-    timeout: int = 300,
-    use_mirror: bool = False
-) -> bool:
-    """
-    Download model from HuggingFace or mirror.
+def run_command(cmd, timeout=300, env=None):
+    """Run shell command with timeout."""
+    print(f"  执行: {cmd}")
     
-    Args:
-        repo_id: HuggingFace repo ID (e.g., lerobot/smolvla_base)
-        proxy: Proxy URL (e.g., http://127.0.0.1:10809)
-        hf_token: HuggingFace token
-        timeout: Download timeout in seconds
-        use_mirror: Whether to use hf-mirror.com
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
     
-    Returns:
-        True if successful
-    """
-    # Set environment variables
-    env = os.environ.copy()
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+            env=merged_env
+        )
+        return result.returncode == 0, result.stdout, result.stderr
+    except subprocess.TimeoutExpired:
+        return False, "", "Timeout"
+
+
+def download_from_gitcode(repo_id, cache_dir, timeout=120):
+    """Download model from GitCode."""
+    print(f"\n🔄 Attempt 1: Trying GitCode (optimized for China)...")
+    print(f"  Source: {GITCODE_BASE_URL}")
+    print(f"  Model: {repo_id}")
+    
+    if repo_id not in GITCODE_MODELS:
+        print(f"  ⚠️  Model not available on GitCode: {repo_id}")
+        print(f"  Available models: {', '.join(GITCODE_MODELS.keys())}")
+        return False
+    
+    filename = GITCODE_MODELS[repo_id]
+    url = f"{GITCODE_BASE_URL}/{filename}"
+    download_path = cache_dir / filename
+    
+    print(f"  URL: {url}")
+    print(f"  Timeout: {timeout}s")
+    
+    # Download file
+    cmd = f"curl -L --connect-timeout 10 -m {timeout} -o '{download_path}' '{url}'"
+    success, stdout, stderr = run_command(cmd, timeout=timeout + 10)
+    
+    if not success or not download_path.exists() or download_path.stat().st_size == 0:
+        print(f"  ❌ Download failed from GitCode")
+        if download_path.exists():
+            download_path.unlink()
+        return False
+    
+    file_size_mb = download_path.stat().st_size / (1024 * 1024)
+    print(f"  ✅ Download successful from GitCode")
+    print(f"     Size: {file_size_mb:.1f}MB (compressed)")
+    
+    # Extract tar.gz
+    print(f"  📦 Extracting...")
+    try:
+        with tarfile.open(download_path, 'r:gz') as tar:
+            tar.extractall(path=cache_dir)
+        download_path.unlink()  # Remove compressed file
+        print(f"  ✅ Extraction complete")
+        return True
+    except Exception as e:
+        print(f"  ❌ Extraction failed: {e}")
+        return False
+
+
+def download_from_huggingface(repo_id, cache_dir, mirror="huggingface.co", timeout=300, proxy=None):
+    """Download model from HuggingFace."""
+    print(f"\n🔄 Attempt: Trying {mirror}...")
+    print(f"  Source: {mirror}")
+    print(f"  Repo: {repo_id}")
+    print(f"  Timeout: {timeout}s")
+    
+    # Set environment
+    env = {}
+    if mirror != "huggingface.co":
+        env["HF_ENDPOINT"] = f"https://{mirror}"
     
     if proxy:
         env["HTTP_PROXY"] = proxy
         env["HTTPS_PROXY"] = proxy
     
-    if hf_token:
-        env["HF_TOKEN"] = hf_token
+    # Use huggingface-cli to download
+    cmd = f"huggingface-cli download {repo_id}"
+    success, stdout, stderr = run_command(cmd, timeout=timeout, env=env)
     
-    # Set mirror endpoint if needed
-    if use_mirror:
-        env["HF_ENDPOINT"] = "https://hf-mirror.com"
-        source = "hf-mirror.com"
+    if success:
+        print(f"  ✅ Download successful from {mirror}")
+        return True
     else:
-        env["HF_ENDPOINT"] = "https://huggingface.co"
-        source = "huggingface.co"
-    
-    print(f"  Source: {source}")
-    print(f"  Repo: {repo_id}")
-    print(f"  Timeout: {timeout}s")
-    
-    # Build huggingface-cli command
-    cmd = [
-        "huggingface-cli", "download",
-        repo_id,
-        "--local-dir", os.path.expanduser(f"~/.cache/huggingface/hub/models--{repo_id.replace('/', '--')}"),
-    ]
-    
-    try:
-        start_time = time.time()
-        result = subprocess.run(
-            cmd,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-        
-        elapsed = time.time() - start_time
-        
-        if result.returncode == 0:
-            print(f"✅ Download successful from {source}")
-            print(f"   Time: {elapsed:.1f}s")
-            if result.stdout:
-                print(result.stdout[-500:])  # Last 500 chars
-            return True
-        else:
-            print(f"❌ Download failed from {source}")
-            print(f"   Error: {result.stderr[-500:]}")
-            return False
-            
-    except subprocess.TimeoutExpired:
-        print(f"❌ Download timeout from {source} (>{timeout}s)")
+        print(f"  ❌ Download failed from {mirror}")
+        if "Timeout" in stderr:
+            print(f"     Reason: Timeout (>{timeout}s)")
+        elif stderr:
+            print(f"     Error: {stderr[:200]}")
         return False
-    except Exception as e:
-        print(f"❌ Download error from {source}: {e}")
-        return False
-
-
-def download_with_fallback(
-    repo_id: str,
-    proxy: str = None,
-    hf_token: str = None,
-    timeout: int = 300
-) -> dict:
-    """
-    Download with automatic mirror fallback.
-    
-    Returns:
-        {
-            "success": bool,
-            "source": str,  # "huggingface.co" or "hf-mirror.com"
-            "attempts": int
-        }
-    """
-    result = {
-        "success": False,
-        "source": None,
-        "attempts": 0
-    }
-    
-    # Attempt 1: Try huggingface.co
-    result["attempts"] += 1
-    print(f"\n🔄 Attempt {result['attempts']}: Trying huggingface.co...")
-    
-    if download_from_huggingface(
-        repo_id=repo_id,
-        proxy=proxy,
-        hf_token=hf_token,
-        timeout=timeout,
-        use_mirror=False
-    ):
-        result["success"] = True
-        result["source"] = "huggingface.co"
-        return result
-    
-    # Attempt 2: Fallback to hf-mirror.com
-    result["attempts"] += 1
-    print(f"\n🔄 Attempt {result['attempts']}: Falling back to hf-mirror.com...")
-    
-    if download_from_huggingface(
-        repo_id=repo_id,
-        proxy=proxy,
-        hf_token=hf_token,
-        timeout=timeout,
-        use_mirror=True
-    ):
-        result["success"] = True
-        result["source"] = "hf-mirror.com"
-        return result
-    
-    # Both failed
-    print(f"\n❌ All download attempts failed")
-    return result
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Download models from HuggingFace with mirror fallback")
-    parser.add_argument("--repo-id", required=True, help="HuggingFace repo ID")
-    parser.add_argument("--proxy", default=None, help="Proxy URL")
-    parser.add_argument("--hf-token", default=None, help="HuggingFace token")
-    parser.add_argument("--timeout", type=int, default=300, help="Download timeout in seconds")
+    parser = argparse.ArgumentParser(
+        description="Download models from GitCode or HuggingFace with automatic fallback"
+    )
+    parser.add_argument(
+        "--repo-id",
+        required=True,
+        help="Model repository ID (e.g., lerobot/smolvla_base)"
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=str(DEFAULT_CACHE_DIR),
+        help=f"Cache directory (default: {DEFAULT_CACHE_DIR})"
+    )
+    parser.add_argument(
+        "--gitcode-url",
+        default=GITCODE_BASE_URL,
+        help="GitCode base URL"
+    )
+    parser.add_argument(
+        "--proxy",
+        help="Proxy URL (e.g., http://127.0.0.1:10809)"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Download timeout in seconds (default: 300)"
+    )
+    parser.add_argument(
+        "--skip-gitcode",
+        action="store_true",
+        help="Skip GitCode and download from HuggingFace directly"
+    )
+    parser.add_argument(
+        "--skip-hf-mirror",
+        action="store_true",
+        help="Skip hf-mirror.com fallback"
+    )
     
     args = parser.parse_args()
     
-    result = download_with_fallback(
-        repo_id=args.repo_id,
-        proxy=args.proxy,
-        hf_token=args.hf_token,
-        timeout=args.timeout
-    )
+    # Create cache directory
+    cache_dir = Path(args.cache_dir)
+    cache_dir.mkdir(parents=True, exist_ok=True)
     
-    if result["success"]:
-        print(f"\n✅ Model downloaded successfully from {result['source']}")
-        sys.exit(0)
-    else:
-        print(f"\n❌ Failed to download model after {result['attempts']} attempts")
-        sys.exit(1)
+    print(f"🚀 Model Download - {args.repo_id}")
+    print(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print(f"  Cache Dir: {cache_dir}")
+    print(f"  Proxy: {args.proxy or 'None'}")
+    print(f"  Timeout: {args.timeout}s")
+    
+    start_time = time.time()
+    
+    # Strategy 1: Try GitCode first
+    if not args.skip_gitcode:
+        if download_from_gitcode(args.repo_id, cache_dir, timeout=min(args.timeout, 120)):
+            elapsed = time.time() - start_time
+            print(f"\n✅ Model downloaded successfully from GitCode")
+            print(f"   Time: {elapsed:.1f}s")
+            return 0
+    
+    # Strategy 2: Try huggingface.co
+    if download_from_huggingface(
+        args.repo_id,
+        cache_dir,
+        mirror="huggingface.co",
+        timeout=args.timeout,
+        proxy=args.proxy
+    ):
+        elapsed = time.time() - start_time
+        print(f"\n✅ Model downloaded successfully from huggingface.co")
+        print(f"   Time: {elapsed:.1f}s")
+        return 0
+    
+    # Strategy 3: Try hf-mirror.com
+    if not args.skip_hf_mirror:
+        if download_from_huggingface(
+            args.repo_id,
+            cache_dir,
+            mirror="hf-mirror.com",
+            timeout=args.timeout,
+            proxy=args.proxy
+        ):
+            elapsed = time.time() - start_time
+            print(f"\n✅ Model downloaded successfully from hf-mirror.com")
+            print(f"   Time: {elapsed:.1f}s")
+            return 0
+    
+    # All strategies failed
+    print(f"\n❌ All download attempts failed")
+    print(f"\n建议:")
+    print(f"  1. 检查代理设置: --proxy http://127.0.0.1:10809")
+    print(f"  2. 增加超时时间: --timeout 600")
+    print(f"  3. 检查网络连接")
+    print(f"  4. 确认模型名称正确: {args.repo_id}")
+    
+    return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

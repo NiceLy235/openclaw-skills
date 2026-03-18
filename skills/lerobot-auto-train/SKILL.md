@@ -386,14 +386,26 @@ python lerobot_edit_dataset.py \
 
 当从 HuggingFace 下载模型时，系统会自动：
 
-1. **优先尝试 huggingface.co**（官方源）
+1. **优先尝试 GitCode**（中国用户专属镜像）⭐ NEW
+   - 国内访问速度快（~20-50ms）
+   - 常用模型已预上传
+   - 无需代理即可访问
+
+2. **失败后尝试 huggingface.co**（官方源）
    - 更新最快，版本最新
    - 适合网络畅通的环境
 
-2. **失败后自动切换 hf-mirror.com**（中国镜像）
-   - 国内访问速度更快
+3. **最后尝试 hf-mirror.com**（中国镜像）
+   - 国内访问速度较快
    - 与官方源同步更新
-   - 适合中国用户
+
+**支持的 GitCode 模型列表：**
+
+| 模型名称 | GitCode 路径 | 压缩后大小 | 状态 |
+|---------|-------------|-----------|------|
+| lerobot/smolvla_base | `models--lerobot--smolvla_base.tar.gz` | 686MB | ✅ 已上传 |
+| lerobot/pi05_base | `models--lerobot--pi05_base.tar.gz` | 233MB | ✅ 已上传 |
+| google/paligemma-3b-pt-224 | `models--google--paligemma-3b-pt-224.tar.gz` | 6.8MB | ✅ 已上传 |
 
 **使用方法：**
 
@@ -401,9 +413,14 @@ python lerobot_edit_dataset.py \
 # 方式 1: 使用 download_model.py 脚本（推荐）
 python scripts/download_model.py \
   --repo-id lerobot/smolvla_base \
+  --gitcode-url https://gitcode.com/nicely235/place/-/raw/main \
   --proxy http://127.0.0.1:10809
 
-# 方式 2: 手动设置镜像
+# 方式 2: 手动从 GitCode 下载
+wget https://gitcode.com/nicely235/place/-/raw/main/models--lerobot--smolvla_base.tar.gz
+tar -xzf models--lerobot--smolvla_base.tar.gz -C ~/.cache/huggingface/hub/
+
+# 方式 3: 手动设置 HuggingFace 镜像
 export HF_ENDPOINT=https://hf-mirror.com
 huggingface-cli download lerobot/smolvla_base
 ```
@@ -411,14 +428,23 @@ huggingface-cli download lerobot/smolvla_base
 **输出示例：**
 
 ```
-🔄 Attempt 1: Trying huggingface.co...
+🔄 Attempt 1: Trying GitCode (optimized for China)...
+  Source: gitcode.com/nicely235/place
+  Model: models--lerobot--smolvla_base.tar.gz
+  Timeout: 120s
+
+✅ Download successful from GitCode
+   Time: 15.2s
+   Size: 686MB (compressed)
+
+🔄 Attempt 2: Trying huggingface.co... (if GitCode failed)
   Source: huggingface.co
   Repo: lerobot/smolvla_base
   Timeout: 300s
 
 ❌ Download timeout from huggingface.co (>300s)
 
-🔄 Attempt 2: Falling back to hf-mirror.com...
+🔄 Attempt 3: Falling back to hf-mirror.com...
   Source: hf-mirror.com
   Repo: lerobot/smolvla_base
   Timeout: 300s
@@ -426,7 +452,7 @@ huggingface-cli download lerobot/smolvla_base
 ✅ Download successful from hf-mirror.com
    Time: 45.2s
 
-✅ Model downloaded successfully from hf-mirror.com
+✅ Model downloaded successfully
 ```
 
 **常见问题：**
