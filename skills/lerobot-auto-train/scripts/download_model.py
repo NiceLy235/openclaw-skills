@@ -81,6 +81,8 @@ def download_from_gitcode(repo_id, cache_dir, timeout=120, proxy=None):
         
         # Step 1: Clone repository (without LFS files)
         print(f"  📥 Cloning repository...")
+        # Skip automatic LFS download to speed up clone
+        env["GIT_LFS_SKIP_SMUDGE"] = "1"
         cmd = f"git clone --depth 1 https://gitcode.com/nicely235/place.git {repo_dir}"
         success, stdout, stderr = run_command(cmd, timeout=60, env=env)
         
@@ -88,16 +90,22 @@ def download_from_gitcode(repo_id, cache_dir, timeout=120, proxy=None):
             print(f"  ❌ Clone failed: {stderr[:200]}")
             return False
         
-        # Step 2: Pull LFS files
+        print(f"  ✅ Clone successful (LFS files not downloaded yet)")
+        
+        # Step 2: Pull specific LFS file
         print(f"  📥 Downloading LFS file: {filename}...")
+        print(f"  ⏱️  This may take 1-3 minutes depending on file size...")
         os.chdir(repo_dir)
         
-        # Pull only the specific file
+        # Pull only the specific file with extended timeout
+        # SmolVLM2 is 910MB, smolvla_base is 686MB
         cmd = f"git lfs pull --include='{filename}'"
         success, stdout, stderr = run_command(cmd, timeout=timeout, env=env)
         
         if not success:
             print(f"  ❌ LFS pull failed: {stderr[:200]}")
+            if "Timeout" in stderr or timeout <= 120:
+                print(f"  💡 Tip: Try increasing --timeout (current: {timeout}s)")
             return False
         
         # Check if file exists

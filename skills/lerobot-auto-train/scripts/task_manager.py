@@ -316,7 +316,7 @@ class TaskManager:
                     download_cmd = f"python {download_script} --repo-id {model_repo_id}"
                     if proxy:
                         download_cmd += f" --proxy {proxy}"
-                    download_cmd += " --timeout 300"
+                    download_cmd += " --timeout 600"  # 10 minutes for large files
                     
                     f.write(f"{download_cmd}\n")
                     f.write("DOWNLOAD_EXIT_CODE=$?\n")

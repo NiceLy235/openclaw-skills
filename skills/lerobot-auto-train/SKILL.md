@@ -424,17 +424,26 @@ python lerobot_edit_dataset.py \
 # 方式 1: 使用 download_model.py 脚本（推荐）
 python scripts/download_model.py \
   --repo-id lerobot/smolvla_base \
-  --gitcode-url https://gitcode.com/nicely235/place/-/raw/main \
-  --proxy http://127.0.0.1:10809
+  --proxy http://127.0.0.1:10809 \
+  --timeout 600  # 建议 600 秒（10分钟）用于大文件
 
-# 方式 2: 手动从 GitCode 下载
-wget https://gitcode.com/nicely235/place/-/raw/main/models--lerobot--smolvla_base.tar.gz
+# 方式 2: 手动从 GitCode 下载（使用 git lfs）
+git lfs install
+GIT_LFS_SKIP_SMUDGE=1 git clone https://gitcode.com/nicely235/place.git
+cd place
+git lfs pull --include="models--lerobot--smolvla_base.tar.gz"
 tar -xzf models--lerobot--smolvla_base.tar.gz -C ~/.cache/huggingface/hub/
 
-# 方式 3: 手动设置 HuggingFace 镜像
+# 方式 3: 手动设置 HuggingFace 镜像（如果 GitCode 失败）
 export HF_ENDPOINT=https://hf-mirror.com
 huggingface-cli download lerobot/smolvla_base
 ```
+
+**⏱️  下载时间参考（使用代理）：**
+- paligemma (6.8MB): ~5 秒
+- smolvla_base (686MB): ~2-3 分钟
+- SmolVLM2 (910MB): ~3-5 分钟
+- pi05_base (1.9GB): ~8-10 分钟
 
 **输出示例：**
 
