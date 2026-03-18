@@ -401,12 +401,22 @@ python lerobot_edit_dataset.py \
 
 **支持的 GitCode 模型列表：**
 
-| 模型名称 | GitCode 路径 | 压缩后大小 | 状态 |
-|---------|-------------|-----------|------|
-| lerobot/smolvla_base | `models--lerobot--smolvla_base.tar.gz` | 686MB | ✅ 已上传 |
-| lerobot/pi05_base | `models--lerobot--pi05_base.tar.gz` | 233MB | ✅ 已上传 |
-| google/paligemma-3b-pt-224 | `models--google--paligemma-3b-pt-224.tar.gz` | 6.8MB | ✅ 已上传 |
-| HuggingFaceTB/SmolVLM2-500M-Video-Instruct | `models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct.tar.gz` | 910MB | ✅ 已上传 |
+| 模型名称 | GitCode 路径 | 压缩后大小 | 状态 | 用途 |
+|---------|-------------|-----------|------|------|
+| lerobot/smolvla_base | `models--lerobot--smolvla_base.tar.gz` | 686MB | ✅ 已上传 | SmolVLA policy 权重 |
+| HuggingFaceTB/SmolVLM2-500M-Video-Instruct | `models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct.tar.gz` | 910MB | ✅ 已上传 | SmolVLA VLM backbone ⭐ |
+| lerobot/pi05_base | `models--lerobot--pi05_base.tar.gz` | 233MB | ✅ 已上传 | PI0 policy 权重 |
+| google/paligemma-3b-pt-224 | `models--google--paligemma-3b-pt-224.tar.gz` | 6.8MB | ✅ 已上传 | PaliGemma 视觉模型 |
+
+**⚠️ 重要说明：**
+
+**SmolVLA 训练需要下载两个模型：**
+1. `lerobot/smolvla_base` (686MB) - LeRobot policy 权重
+2. `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` (910MB) - VLM backbone 权重
+
+**总下载大小：约 1.6GB**（压缩后）
+
+训练脚本会自动下载这两个模型到 HuggingFace cache，无需手动操作。
 
 **使用方法：**
 

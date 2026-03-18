@@ -266,11 +266,16 @@ class TaskManager:
         # Determine model repo_id based on policy_type
         config = task_meta["config"]
         policy_type = config.get("policy_type", "smolvla")
-        model_repo_id = None
+        model_repo_ids = []  # Changed to list for multiple models
+
         if policy_type == "smolvla":
-            model_repo_id = "lerobot/smolvla_base"
+            # SmolVLA requires TWO models:
+            # 1. LeRobot policy weights
+            model_repo_ids.append("lerobot/smolvla_base")
+            # 2. VLM backbone (SmolVLM2)
+            model_repo_ids.append("HuggingFaceTB/SmolVLM2-500M-Video-Instruct")
         elif policy_type == "pi0":
-            model_repo_id = "lerobot/pi05_base"
+            model_repo_ids.append("lerobot/pi05_base")
         # Add more model mappings as needed
         
         # Write wrapper script
@@ -297,25 +302,33 @@ class TaskManager:
             # Working directory
             f.write(f"cd {self.lerobot_dir}\n\n")
             
-            # CRITICAL: Download model BEFORE training (with GitCode mirror fallback)
-            if model_repo_id and download_script.exists():
-                f.write("# Step 1: Download model from GitCode or HuggingFace\n")
+            # CRITICAL: Download models BEFORE training (with GitCode mirror fallback)
+            if model_repo_ids and download_script.exists():
+                f.write("# Step 1: Download models from GitCode or HuggingFace\n")
                 f.write("echo '========================================'\n")
-                f.write("echo '🚀 Step 1: Downloading model...'\n")
+                f.write("echo '🚀 Step 1: Downloading models...'\n")
                 f.write("echo '========================================'\n")
                 
-                download_cmd = f"python {download_script} --repo-id {model_repo_id}"
-                if proxy:
-                    download_cmd += f" --proxy {proxy}"
-                download_cmd += " --timeout 300"
+                for idx, model_repo_id in enumerate(model_repo_ids, 1):
+                    f.write(f"echo ''\n")
+                    f.write(f"echo '📦 Model {idx}/{len(model_repo_ids)}: {model_repo_id}'\n")
+                    
+                    download_cmd = f"python {download_script} --repo-id {model_repo_id}"
+                    if proxy:
+                        download_cmd += f" --proxy {proxy}"
+                    download_cmd += " --timeout 300"
+                    
+                    f.write(f"{download_cmd}\n")
+                    f.write("DOWNLOAD_EXIT_CODE=$?\n")
+                    f.write("if [ $DOWNLOAD_EXIT_CODE -ne 0 ]; then\n")
+                    f.write(f"  echo '❌ Model download failed: {model_repo_id}'\n")
+                    f.write("  echo 'Training cannot proceed.'\n")
+                    f.write("  exit 1\n")
+                    f.write("fi\n")
+                    f.write(f"echo '✅ Model {idx} downloaded successfully'\n")
                 
-                f.write(f"{download_cmd}\n")
-                f.write("DOWNLOAD_EXIT_CODE=$?\n")
-                f.write("if [ $DOWNLOAD_EXIT_CODE -ne 0 ]; then\n")
-                f.write("  echo '❌ Model download failed! Training cannot proceed.'\n")
-                f.write("  exit 1\n")
-                f.write("fi\n")
-                f.write("echo '✅ Model downloaded successfully'\n")
+                f.write("echo ''\n")
+                f.write("echo '✅ All models downloaded successfully'\n")
                 f.write("echo ''\n\n")
             
             # Training command
