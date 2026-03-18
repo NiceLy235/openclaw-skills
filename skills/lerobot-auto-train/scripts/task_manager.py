@@ -259,6 +259,20 @@ class TaskManager:
         # Build training command
         cmd = self._build_train_command(task_meta, proxy, hf_token, conda_env)
         
+        # Find download_model.py script (same directory as this script)
+        script_dir = Path(__file__).parent
+        download_script = script_dir / "download_model.py"
+        
+        # Determine model repo_id based on policy_type
+        config = task_meta["config"]
+        policy_type = config.get("policy_type", "smolvla")
+        model_repo_id = None
+        if policy_type == "smolvla":
+            model_repo_id = "lerobot/smolvla_base"
+        elif policy_type == "pi0":
+            model_repo_id = "lerobot/pi05_base"
+        # Add more model mappings as needed
+        
         # Write wrapper script
         script_file = self.tasks_dir / task_id / "run_training.sh"
         with open(script_file, 'w') as f:
@@ -283,7 +297,32 @@ class TaskManager:
             # Working directory
             f.write(f"cd {self.lerobot_dir}\n\n")
             
+            # CRITICAL: Download model BEFORE training (with GitCode mirror fallback)
+            if model_repo_id and download_script.exists():
+                f.write("# Step 1: Download model from GitCode or HuggingFace\n")
+                f.write("echo '========================================'\n")
+                f.write("echo '🚀 Step 1: Downloading model...'\n")
+                f.write("echo '========================================'\n")
+                
+                download_cmd = f"python {download_script} --repo-id {model_repo_id}"
+                if proxy:
+                    download_cmd += f" --proxy {proxy}"
+                download_cmd += " --timeout 300"
+                
+                f.write(f"{download_cmd}\n")
+                f.write("DOWNLOAD_EXIT_CODE=$?\n")
+                f.write("if [ $DOWNLOAD_EXIT_CODE -ne 0 ]; then\n")
+                f.write("  echo '❌ Model download failed! Training cannot proceed.'\n")
+                f.write("  exit 1\n")
+                f.write("fi\n")
+                f.write("echo '✅ Model downloaded successfully'\n")
+                f.write("echo ''\n\n")
+            
             # Training command
+            f.write("# Step 2: Run training\n")
+            f.write("echo '========================================'\n")
+            f.write("echo '🚀 Step 2: Starting training...'\n")
+            f.write("echo '========================================'\n")
             f.write(cmd + "\n")
         
         os.chmod(script_file, 0o755)

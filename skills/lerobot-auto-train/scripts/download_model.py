@@ -19,6 +19,7 @@ GITCODE_MODELS = {
     "lerobot/smolvla_base": "models--lerobot--smolvla_base.tar.gz",
     "lerobot/pi05_base": "models--lerobot--pi05_base.tar.gz",
     "google/paligemma-3b-pt-224": "models--google--paligemma-3b-pt-224.tar.gz",
+    "HuggingFaceTB/SmolVLM2-500M-Video-Instruct": "models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct.tar.gz",
 }
 
 # HuggingFace mirrors
@@ -50,10 +51,10 @@ def run_command(cmd, timeout=300, env=None):
         return False, "", "Timeout"
 
 
-def download_from_gitcode(repo_id, cache_dir, timeout=120):
-    """Download model from GitCode."""
+def download_from_gitcode(repo_id, cache_dir, timeout=120, proxy=None):
+    """Download model from GitCode using git lfs."""
     print(f"\n🔄 Attempt 1: Trying GitCode (optimized for China)...")
-    print(f"  Source: {GITCODE_BASE_URL}")
+    print(f"  Source: gitcode.com/nicely235/place")
     print(f"  Model: {repo_id}")
     
     if repo_id not in GITCODE_MODELS:
@@ -62,37 +63,64 @@ def download_from_gitcode(repo_id, cache_dir, timeout=120):
         return False
     
     filename = GITCODE_MODELS[repo_id]
-    url = f"{GITCODE_BASE_URL}/{filename}"
-    download_path = cache_dir / filename
     
-    print(f"  URL: {url}")
-    print(f"  Timeout: {timeout}s")
-    
-    # Download file
-    cmd = f"curl -L --connect-timeout 10 -m {timeout} -o '{download_path}' '{url}'"
-    success, stdout, stderr = run_command(cmd, timeout=timeout + 10)
-    
-    if not success or not download_path.exists() or download_path.stat().st_size == 0:
-        print(f"  ❌ Download failed from GitCode")
-        if download_path.exists():
-            download_path.unlink()
-        return False
-    
-    file_size_mb = download_path.stat().st_size / (1024 * 1024)
-    print(f"  ✅ Download successful from GitCode")
-    print(f"     Size: {file_size_mb:.1f}MB (compressed)")
-    
-    # Extract tar.gz
-    print(f"  📦 Extracting...")
-    try:
-        with tarfile.open(download_path, 'r:gz') as tar:
-            tar.extractall(path=cache_dir)
-        download_path.unlink()  # Remove compressed file
-        print(f"  ✅ Extraction complete")
-        return True
-    except Exception as e:
-        print(f"  ❌ Extraction failed: {e}")
-        return False
+    # Create temporary directory for cloning
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        repo_dir = tmpdir_path / "place"
+        
+        print(f"  Method: git clone + git lfs pull")
+        print(f"  Timeout: {timeout}s")
+        
+        # Set proxy environment
+        env = {}
+        if proxy:
+            env["HTTP_PROXY"] = proxy
+            env["HTTPS_PROXY"] = proxy
+        
+        # Step 1: Clone repository (without LFS files)
+        print(f"  📥 Cloning repository...")
+        cmd = f"git clone --depth 1 https://gitcode.com/nicely235/place.git {repo_dir}"
+        success, stdout, stderr = run_command(cmd, timeout=60, env=env)
+        
+        if not success:
+            print(f"  ❌ Clone failed: {stderr[:200]}")
+            return False
+        
+        # Step 2: Pull LFS files
+        print(f"  📥 Downloading LFS file: {filename}...")
+        os.chdir(repo_dir)
+        
+        # Pull only the specific file
+        cmd = f"git lfs pull --include='{filename}'"
+        success, stdout, stderr = run_command(cmd, timeout=timeout, env=env)
+        
+        if not success:
+            print(f"  ❌ LFS pull failed: {stderr[:200]}")
+            return False
+        
+        # Check if file exists
+        lfs_file = repo_dir / filename
+        if not lfs_file.exists() or lfs_file.stat().st_size == 0:
+            print(f"  ❌ LFS file not found or empty")
+            return False
+        
+        file_size_mb = lfs_file.stat().st_size / (1024 * 1024)
+        print(f"  ✅ Download successful from GitCode")
+        print(f"     Size: {file_size_mb:.1f}MB (compressed)")
+        
+        # Step 3: Extract tar.gz to cache directory
+        print(f"  📦 Extracting...")
+        try:
+            with tarfile.open(lfs_file, 'r:gz') as tar:
+                tar.extractall(path=cache_dir)
+            print(f"  ✅ Extraction complete")
+            print(f"  📁 Model saved to: {cache_dir}")
+            return True
+        except Exception as e:
+            print(f"  ❌ Extraction failed: {e}")
+            return False
 
 
 def download_from_huggingface(repo_id, cache_dir, mirror="huggingface.co", timeout=300, proxy=None):
@@ -183,7 +211,7 @@ def main():
     
     # Strategy 1: Try GitCode first
     if not args.skip_gitcode:
-        if download_from_gitcode(args.repo_id, cache_dir, timeout=min(args.timeout, 120)):
+        if download_from_gitcode(args.repo_id, cache_dir, timeout=min(args.timeout, 120), proxy=args.proxy):
             elapsed = time.time() - start_time
             print(f"\n✅ Model downloaded successfully from GitCode")
             print(f"   Time: {elapsed:.1f}s")

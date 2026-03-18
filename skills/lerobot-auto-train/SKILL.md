@@ -406,6 +406,7 @@ python lerobot_edit_dataset.py \
 | lerobot/smolvla_base | `models--lerobot--smolvla_base.tar.gz` | 686MB | ✅ 已上传 |
 | lerobot/pi05_base | `models--lerobot--pi05_base.tar.gz` | 233MB | ✅ 已上传 |
 | google/paligemma-3b-pt-224 | `models--google--paligemma-3b-pt-224.tar.gz` | 6.8MB | ✅ 已上传 |
+| HuggingFaceTB/SmolVLM2-500M-Video-Instruct | `models--HuggingFaceTB--SmolVLM2-500M-Video-Instruct.tar.gz` | 910MB | ✅ 已上传 |
 
 **使用方法：**
 

@@ -699,3 +699,91 @@ bash skills/env-setup/scripts/install_v2ray.sh --skip-download
 
 **Last Updated**: 2026-03-17 18:42
 **Next Review**: 下次在云端机器安装 V2Ray 时
+
+---
+
+## 🤖 LeRobot 训练 - 自动模型下载与镜像切换 (2026-03-18 15:10)
+
+### 问题发现
+
+用户反馈：**"从 HuggingFace 下载模型失败后，没有自动切换到 GitCode 镜像"**
+
+### 根本原因
+
+`task_manager.py` 在提交训练任务时：
+1. ❌ **没有调用 `download_model.py`**
+2. ❌ 直接运行 `lerobot_train.py`，依赖其内置下载逻辑
+3. ❌ `lerobot_train.py` 不会使用 GitCode 镜像
+
+### 解决方案
+
+**修改 `task_manager.py` 的 `_start_background_task()` 方法：**
+
+```python
+# 在训练开始前添加模型下载步骤
+if model_repo_id and download_script.exists():
+    # Step 1: Download model from GitCode or HuggingFace
+    download_cmd = f"python {download_script} --repo-id {model_repo_id}"
+    if proxy:
+        download_cmd += f" --proxy {proxy}"
+    download_cmd += " --timeout 300"
+    
+    # 执行下载，失败则停止训练
+    f.write(f"{download_cmd}\n")
+    f.write("if [ $? -ne 0 ]; then exit 1; fi\n")
+    
+# Step 2: Run training
+f.write(cmd + "\n")
+```
+
+### 新的执行流程
+
+```
+1. 用户提交训练任务
+   ↓
+2. task_manager.py 创建 run_training.sh
+   ↓
+3. run_training.sh 执行：
+   ├─ Step 1: 调用 download_model.py
+   │  ├─ 尝试 GitCode (120s timeout)
+   │  ├─ 失败 → 尝试 huggingface.co (300s timeout)
+   │  └─ 失败 → 尝试 hf-mirror.com (300s timeout)
+   └─ Step 2: 运行 lerobot_train.py
+```
+
+### 模型映射表
+
+| Policy Type | 模型 Repo ID | GitCode 文件名 |
+|------------|-------------|---------------|
+| smolvla | `lerobot/smolvla_base` | `models--lerobot--smolvla_base.tar.gz` |
+| pi0 | `lerobot/pi05_base` | `models--lerobot--pi05_base.tar.gz` |
+
+### 验证方法
+
+**下次训练时检查日志：**
+```bash
+# 查看训练日志
+cat ~/.openclaw/tasks/<task_id>/training_<task_id>.log | grep "Step 1"
+
+# 应该看到：
+# 🚀 Step 1: Downloading model...
+# 🔄 Attempt 1: Trying GitCode...
+# ✅ Model downloaded successfully from GitCode
+```
+
+### 已修改文件
+
+- `skills/lerobot-auto-train/scripts/task_manager.py` - 添加模型下载步骤
+- `skills/lerobot-auto-train/SKILL.md` - 文档已有描述，无需修改
+
+### 测试建议
+
+**下次训练任务时验证：**
+1. 观察日志中是否出现 "Step 1: Downloading model"
+2. 检查是否成功从 GitCode 下载
+3. 如果 GitCode 失败，是否切换到 HuggingFace
+
+---
+
+**Last Updated**: 2026-03-18 15:12
+**Next Review**: 下次执行 LeRobot 训练时
