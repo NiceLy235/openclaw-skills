@@ -352,7 +352,9 @@ configure_v2ray() {
     local config_file="$config_dir/config.json"
     local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     local config_save="$script_dir/../config/v2ray_server.json"
-    local template="$script_dir/../config/v2ray_template.json"
+    
+    # Create config directory
+    sudo mkdir -p "$config_dir"
     
     # Check if config file exists
     if [ -f "$config_file" ]; then
@@ -361,7 +363,20 @@ configure_v2ray() {
         sudo cp "$config_file" "$config_file.backup.$(date +%Y%m%d_%H%M%S)"
     fi
     
-    # Ask user if they want to use saved configuration
+    # Try to download config template from GitCode first
+    log INFO "Downloading V2Ray config template from GitCode..."
+    
+    if curl -L --connect-timeout 10 -m 30 -o "$config_file" "$GITCODE_CONFIG_V2RAY_URL" 2>/dev/null; then
+        if [ -f "$config_file" ] && [ -s "$config_file" ]; then
+            log SUCCESS "Downloaded config template from GitCode"
+            log WARNING "Please edit $config_file and update YOUR_SERVER_ADDRESS and YOUR_UUID"
+            return 0
+        fi
+    fi
+    
+    log WARNING "Failed to download from GitCode, using local template..."
+    
+    # Check if saved configuration exists
     if [ -f "$config_save" ]; then
         log INFO "Found saved V2Ray server configuration"
         echo ""
