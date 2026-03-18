@@ -98,6 +98,96 @@ metadata:
 
 - ✅ 使用 `lerobot_edit_dataset` 合并数据集
 - ✅ 使用 `lerobot_train` 进行训练
+
+---
+
+## Standard Workflow
+
+**完整的训练流程：**
+
+```
+Step 0: 检查网络和代理配置 (MANDATORY)
+Step 1: 检查数据集
+Step 2: 合并数据集（如需要）
+Step 3: 检查训练环境
+Step 4: 生成训练配置
+Step 5: 用户确认
+Step 6: 提交训练任务
+Step 7: 监控训练进度
+Step 8: 生成训练报告
+```
+
+---
+
+## ⚠️ MANDATORY Pre-flight Check (Before Any Training)
+
+**CRITICAL: Execute this check BEFORE starting any training task.**
+
+### Step 0: Check Network and Proxy Configuration
+
+**Purpose:** Ensure HuggingFace is accessible before downloading models
+
+**Execution:**
+
+1. **Check proxy environment variables:**
+   ```bash
+   echo "HTTP_PROXY: $HTTP_PROXY"
+   echo "HTTPS_PROXY: $HTTPS_PROXY"
+   echo "ALL_PROXY: $ALL_PROXY"
+   ```
+
+2. **Test HuggingFace connectivity:**
+   ```bash
+   curl -I -m 10 https://huggingface.co 2>&1 | head -5
+   ```
+
+**Expected Result:**
+```
+HTTP/2 200
+content-type: text/html; charset=utf-8
+```
+
+**If Test Fails:**
+
+1. **Set proxy environment variables:**
+   ```bash
+   export HTTP_PROXY=http://127.0.0.1:10809
+   export HTTPS_PROXY=http://127.0.0.1:10809
+   export ALL_PROXY=socks5://127.0.0.1:10808
+   ```
+
+2. **Verify v2ray is running:**
+   ```bash
+   systemctl status v2ray  # Linux
+   # 或
+   ps aux | grep v2ray     # Container/macOS
+   ```
+
+3. **Restart v2ray if needed:**
+   ```bash
+   sudo systemctl restart v2ray
+   ```
+
+4. **Re-test connectivity:**
+   ```bash
+   curl -I https://huggingface.co
+   ```
+
+**If Still Fails:**
+
+❌ **STOP and report error:**
+```
+❌ 步骤 0 失败：无法连接到 HuggingFace
+原因：代理未配置或 v2ray 服务未运行
+解决方案：
+1. 检查 v2ray 服务状态
+2. 设置代理环境变量
+3. 测试代理连通性
+```
+
+**Do NOT proceed to Step 1 until this check passes.**
+
+---
 - ✅ 后台执行（不阻塞）
 - ✅ 实时进度监控
 - ✅ 代理和 HuggingFace Token 配置
@@ -174,13 +264,41 @@ Use this template for ANY training operation:
 - **Action**: Merge episodes into training dataset
 - **Command**:
   ```bash
+  # 完整流程：自动检测并合并
   python scripts/prepare_dataset.py full \
     --data-dir /path/to/data \
     --repo-prefix train \
     --proxy http://127.0.0.1:10809
+  
+  # 或者分步执行：
+  # Step 3.1: 切分 train/val
+  python scripts/prepare_dataset.py split \
+    --data-dir /path/to/raw_episodes \
+    --output-dir ./processed
+  
+  # Step 3.2: 合并 train 数据集
+  python scripts/prepare_dataset.py merge \
+    --episodes-dir ./processed/train \
+    --repo-id train/merged \
+    --proxy http://127.0.0.1:10809
+  
+  # Step 3.3: 合并 val 数据集
+  python scripts/prepare_dataset.py merge \
+    --episodes-dir ./processed/val \
+    --repo-id val/merged \
+    --proxy http://127.0.0.1:10809
   ```
 - **Expected**: Dataset merged successfully, repo_id returned
 **[Run command, verify, report]**
+
+**Note:** `merge` 命令会在内部调用 `lerobot_edit_dataset.py`，格式为：
+```bash
+python lerobot_edit_dataset.py \
+  --repo_id {repo_id} \
+  --operation.type merge \
+  --operation.repo_id_patterns='["ep1", "ep2", ...]' \
+  --push_to_hub false
+```
 
 ### Step 4: Generate Configuration Preview
 - **Action**: Generate complete training configuration
@@ -213,8 +331,16 @@ Use this template for ANY training operation:
 
 ### Step 6: Submit Training Task
 - **Action**: Submit training task (only after user confirmation)
+- **Pre-flight**: Download model from HuggingFace (with mirror fallback)
 - **Command**:
   ```bash
+  # Step 6.1: Download model (自动尝试 huggingface.co → hf-mirror.com)
+  python scripts/download_model.py \
+    --repo-id lerobot/smolvla_base \
+    --proxy http://127.0.0.1:10809 \
+    --timeout 300
+  
+  # Step 6.2: Submit training task
   python scripts/task_manager.py submit \
     --dataset-repo-id train/merged \
     --model-name smolvla_base \
@@ -223,8 +349,15 @@ Use this template for ANY training operation:
     --proxy http://127.0.0.1:10809 \
     --hf-token YOUR_TOKEN
   ```
-- **Expected**: Task ID returned, training started
+- **Expected**: 
+  - Model downloaded successfully
+  - Task ID returned, training started
 **[Run command, verify, report task ID]**
+
+**Note:** `download_model.py` 会自动处理：
+1. 尝试从 `huggingface.co` 下载
+2. 如果失败或超时，自动切换到 `hf-mirror.com` 镜像站
+3. 使用代理（如果配置）
 
 ### Step 7: Monitor Training Progress
 - **Action**: Monitor training progress in real-time
@@ -236,7 +369,7 @@ Use this template for ANY training operation:
 - **Expected**: Progress updates (current_step, loss, lr)
 **[Monitor and report regularly]**
 
-### Step 8: Generate Training Report
+### Step 9: Generate Training Report
 - **Action**: Generate final training report
 - **Command**:
   ```bash
@@ -247,7 +380,65 @@ Use this template for ANY training operation:
 
 ---
 
-## ⚠️ 训练前确认流程（强制）
+## 🌐 HuggingFace Mirror Strategy (中国用户)
+
+**自动镜像站回退策略：**
+
+当从 HuggingFace 下载模型时，系统会自动：
+
+1. **优先尝试 huggingface.co**（官方源）
+   - 更新最快，版本最新
+   - 适合网络畅通的环境
+
+2. **失败后自动切换 hf-mirror.com**（中国镜像）
+   - 国内访问速度更快
+   - 与官方源同步更新
+   - 适合中国用户
+
+**使用方法：**
+
+```bash
+# 方式 1: 使用 download_model.py 脚本（推荐）
+python scripts/download_model.py \
+  --repo-id lerobot/smolvla_base \
+  --proxy http://127.0.0.1:10809
+
+# 方式 2: 手动设置镜像
+export HF_ENDPOINT=https://hf-mirror.com
+huggingface-cli download lerobot/smolvla_base
+```
+
+**输出示例：**
+
+```
+🔄 Attempt 1: Trying huggingface.co...
+  Source: huggingface.co
+  Repo: lerobot/smolvla_base
+  Timeout: 300s
+
+❌ Download timeout from huggingface.co (>300s)
+
+🔄 Attempt 2: Falling back to hf-mirror.com...
+  Source: hf-mirror.com
+  Repo: lerobot/smolvla_base
+  Timeout: 300s
+
+✅ Download successful from hf-mirror.com
+   Time: 45.2s
+
+✅ Model downloaded successfully from hf-mirror.com
+```
+
+**常见问题：**
+
+| 问题 | 原因 | 解决方案 |
+|------|------|----------|
+| 两个源都失败 | 代理未配置 | 检查 `--proxy` 参数 |
+| 下载速度慢 | 网络限速 | 使用镜像站或增加超时 |
+| 找不到模型 | repo_id 错误 | 检查模型名称拼写 |
+| 权限不足 | 私有模型 | 添加 `--hf-token` |
+
+---
 
 **在提交任何训练任务之前，Agent 必须执行以下确认步骤：**
 
@@ -354,9 +545,25 @@ python scripts/task_manager.py submit \
 
 **关键**: 任务必须在有 `lerobot_ros2` 的机器上运行。
 
+**执行环境要求：**
+1. ✅ 已安装 `lerobot_ros2` 仓库（通过 `env-setup` skill 安装）
+2. ✅ Conda 环境 `lerobot` 已创建
+3. ✅ `lerobot_edit_dataset.py` 存在于执行环境的仓库中
+
+**lerobot_ros2 仓库路径（执行环境）：**
+- 默认：`~/lerobot_ros2`
+- 或：`/home/nice/ly/lerobot_ros2`
+- 或通过环境变量 `LEROBOT_REPO_PATH` 指定
+
+**验证命令：**
 ```bash
-# 确保已安装
-cd /path/to/lerobot_ros2
+# 检查仓库是否存在
+ls -d ~/lerobot_ros2
+
+# 检查脚本是否存在
+ls ~/lerobot_ros2/src/lerobot/scripts/lerobot_edit_dataset.py
+
+# 激活环境
 conda activate lerobot
 ```
 
@@ -364,15 +571,16 @@ conda activate lerobot
 
 ### 完整流程（推荐）
 
-一条命令完成：合并 → 训练
+**一条命令完成：合并 → 训练**
 
 ```bash
+# 1. 合并数据集
 python scripts/prepare_dataset.py full \
   --data-dir /home/nice/ly/data/pre_merge_data/2026_03_04_10_06 \
   --repo-prefix train \
   --proxy http://127.0.0.1:10809
 
-# 然后提交训练
+# 2. 确认配置并提交训练
 python scripts/task_manager.py submit \
   --dataset-repo-id train/merged \
   --model-name smolvla_base \
@@ -380,19 +588,37 @@ python scripts/task_manager.py submit \
   --hf-token YOUR_TOKEN
 ```
 
+**Note:** `prepare_dataset.py full` 会自动：
+1. 检测所有 episodes
+2. 调用 `lerobot_edit_dataset.py` 进行合并
+3. 返回合并后的 `repo_id`
+
 ### 分步执行
 
 #### 1. 合并数据集
 
-使用 `lerobot_edit_dataset` 合并所有 episodes：
+**方式 1: 使用 prepare_dataset.py (推荐)**
 
 ```bash
-# 合并所有 episodes 到一个数据集
+# 自动检测 episodes 并合并
 python scripts/prepare_dataset.py merge \
-  --episodes-dir /path/to/raw_episodes \
+  --episodes-dir /path/to/episodes \
   --repo-id train/merged \
-  --proxy http://127.0.0.1:10809
+  --proxy http://127.0.1:10809
 ```
+
+**方式 2: 直接使用 lerobot_edit_dataset.py**
+
+```bash
+# 严格按照此格式执行
+python lerobot_edit_dataset.py \
+  --repo_id train/merged \
+  --operation.type merge \
+  --operation.repo_id_patterns='["/path/to/episodes/ep_000", "/path/to/episodes/ep_001", ...]' \
+  --push_to_hub false
+```
+
+**Note:** `prepare_dataset.py` 会自动调用 `lerobot_edit_dataset.py` 并正确构建 `repo_id_patterns`。
 
 **输出**: 数据集保存到 `~/.cache/huggingface/lerobot/train/merged`
 
@@ -448,8 +674,18 @@ python scripts/task_manager.py logs <task_id>
 |------|------|--------|
 | `--episodes-dir` | episodes 目录 | 必填 |
 | `--repo-id` | 合并后的 repo ID | 必填 |
-| `--proxy` | 代理 URL | 无 |
+| `--proxy` | 代理 URL (http://127.0.0.1:10809) | 无 |
 | `--conda-env` | Conda 环境名 | lerobot |
+| `--push-to-hub` | 推送到 HuggingFace Hub | false |
+
+**内部执行命令格式：**
+```bash
+python lerobot_edit_dataset.py \
+  --repo_id {repo_id} \
+  --operation.type merge \
+  --operation.repo_id_patterns='["{episodes_dir}/ep_000", "{episodes_dir}/ep_001", ...]' \
+  --push_to_hub false
+```
 
 #### full 命令
 
@@ -459,6 +695,11 @@ python scripts/task_manager.py logs <task_id>
 | `--repo-prefix` | repo ID 前缀 | train |
 | `--proxy` | 代理 URL | 无 |
 | `--conda-env` | Conda 环境名 | lerobot |
+
+**执行流程：**
+1. 检测所有 episodes
+2. 自动生成 `repo_id = {repo-prefix}/merged`
+3. 调用 `lerobot_edit_dataset.py` 进行合并
 
 ### task_manager.py submit
 
@@ -608,6 +849,22 @@ $ python scripts/task_manager.py status train_20260311_150000_abc123
 | 无法访问 HuggingFace | 配置 `--proxy` 和 `--hf-token` |
 | CUDA OOM | 减少 `--batch-size` |
 | 数据集找不到 | 检查 `--dataset-repo-id` 是否正确 |
+| 训练不启动 | 检查 conda 环境和代理设置 |
+
+## 与之前流程的对比
+
+| 旧流程 | 新流程 (lerobot-auto-train) |
+|--------|------------------------------|
+| 手动调用 `lerobot_edit_dataset` | `prepare_dataset.py merge` |
+| 手动编写训练脚本 | `task_manager.py submit` |
+| 手动监控日志 | `task_manager.py status/logs` |
+
+**一条命令完成所有步骤**:
+```bash
+python scripts/prepare_dataset.py full --data-dir ... --repo-prefix train
+python scripts/task_manager.py submit --dataset-repo-id train/merged
+```
+数据集找不到 | 检查 `--dataset-repo-id` 是否正确 |
 | 训练不启动 | 检查 conda 环境和代理设置 |
 
 ## 与之前流程的对比

@@ -124,20 +124,36 @@ def merge_episodes_with_lerobot(
     episode_patterns = [f'"{str(ep)}"' for ep in episode_paths]
     patterns_str = f'[{", ".join(episode_patterns)}]'
     
-    # Find lerobot_edit_dataset.py
+    # Find lerobot_edit_dataset.py in execution environment
+    # It should be in the lerobot_ros2 repository (not workspace)
     script_dir = Path(__file__).parent
-    lerobot_edit_script = script_dir.parent.parent.parent / "lerobot_ros2" / "src" / "lerobot" / "scripts" / "lerobot_edit_dataset.py"
     
-    if not lerobot_edit_script.exists():
-        # Try common locations
-        possible_paths = [
-            Path.home() / "lerobot_ros2" / "src" / "lerobot" / "scripts" / "lerobot_edit_dataset.py",
-            Path("/home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_edit_dataset.py"),
-        ]
+    # Try common locations in execution environment
+    possible_paths = [
+        # User home directory (most common)
+        Path.home() / "lerobot_ros2" / "src" / "lerobot" / "scripts" / "lerobot_edit_dataset.py",
+        # Specific user paths
+        Path("/home/nice/ly/lerobot_ros2/src/lerobot/scripts/lerobot_edit_dataset.py"),
+        # Root user
+        Path("/root/lerobot_ros2/src/lerobot/scripts/lerobot_edit_dataset.py"),
+        # Custom path from environment variable
+        Path(os.environ.get("LEROBOT_REPO_PATH", "/nonexistent")) / "src/lerobot/scripts/lerobot_edit_dataset.py",
+    ]
+    
+    lerobot_edit_script = None
+    for p in possible_paths:
+        if p.exists():
+            lerobot_edit_script = p
+            break
+    
+    if not lerobot_edit_script:
+        print(f"❌ lerobot_edit_dataset.py not found in execution environment")
+        print(f"   Searched locations:")
         for p in possible_paths:
-            if p.exists():
-                lerobot_edit_script = p
-                break
+            if p.exists() or str(p) != "/nonexistent/src/lerobot/scripts/lerobot_edit_dataset.py":
+                print(f"   - {p}")
+        print(f"\n💡 Make sure lerobot_ros2 is installed (run env-setup skill)")
+        return False
     
     # Build shell command
     cmd_parts = [
