@@ -39,6 +39,7 @@
 
 ### 规则说明
 - ⏰ **每 5 分钟**必须发送一次进度消息
+- 🎯 **适用于所有任务**（训练、安装、下载、数据处理等）
 - 📊 进度消息必须包含：
   - 当前执行的步骤
   - 已用时间
@@ -49,83 +50,187 @@
 ```
 📊 进度更新 (5 分钟汇报)
 ━━━━━━━━━━━━━━━━━━━━━━━━
-• 当前步骤: Step 3/5 - 下载模型
+• 任务类型: [训练/安装/下载/数据处理]
+• 当前步骤: Step 3/5 - [具体步骤]
 • 已用时间: 10 分钟
 • 预计剩余: 约 15 分钟
-• 状态: ⏳ 正在下载 (45%)
+• 状态: ⏳ 正在执行 (45%)
 ━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ### 实现方式
 
-**方式 1: 使用后台定时器（推荐）**
+**方式 1: 使用 exec + background progress reporter（推荐）**
+
 ```python
+import subprocess
 import threading
 import time
+from datetime import datetime
 
-class ProgressReporter:
-    def __init__(self, channel="feishu"):
+class UniversalProgressReporter:
+    """Universal progress reporter for any long-running task."""
+
+    def __init__(self, task_name, channel="feishu", interval=300):
+        self.task_name = task_name
         self.channel = channel
+        self.interval = interval  # 5 minutes
         self.running = False
         self.thread = None
+        self.start_time = time.time()
 
     def start(self):
+        """Start progress reporter."""
         self.running = True
-        self.thread = threading.Thread(target=self._report_loop)
-        self.thread.daemon = True
+        self.thread = threading.Thread(target=self._report_loop, daemon=True)
         self.thread.start()
 
     def _report_loop(self):
+        """Send progress every 5 minutes."""
         while self.running:
-            time.sleep(300)  # 5 分钟
+            time.sleep(self.interval)
             if self.running:
                 self._send_progress()
 
     def _send_progress(self):
-        # 发送进度消息到飞书
-        message(action="send", message="📊 进度更新...")
+        """Send progress message."""
+        elapsed = time.time() - self.start_time
+        elapsed_str = self._format_time(elapsed)
+
+        message = f"""📊 进度更新 (5 分钟汇报)
+━━━━━━━━━━━━━━━━━━━━━━━━
+• 任务类型: {self.task_name}
+• 当前步骤: 正在执行...
+• 已用时间: {elapsed_str}
+• 状态: ⏳ 运行中
+━━━━━━━━━━━━━━━━━━━━━━━━"""
+
+        # Send via OpenClaw message tool
+        try:
+            subprocess.run([
+                "openclaw", "message", "send",
+                "--channel", self.channel,
+                "-m", message
+            ], timeout=30)
+        except Exception as e:
+            print(f"Failed to send progress: {e}")
+
+    def _format_time(self, seconds):
+        """Format seconds to human-readable time."""
+        minutes = int(seconds // 60)
+        hours = minutes // 60
+        minutes = minutes % 60
+
+        if hours > 0:
+            return f"{hours}小时{minutes}分钟"
+        else:
+            return f"{minutes}分钟"
 
     def stop(self):
+        """Stop progress reporter."""
         self.running = False
 
-# 使用
-reporter = ProgressReporter()
+# Usage example
+reporter = UniversalProgressReporter(
+    task_name="LeRobot 训练",
+    channel="feishu",
+    interval=300  # 5 minutes
+)
 reporter.start()
 
-# 执行长时间任务
+# Execute long-running task
 long_running_task()
 
-# 停止汇报
+# Stop reporter
 reporter.stop()
 ```
 
-**方式 2: 在长时间命令中定期检查**
+**方式 2: 在 exec 命令中使用 background yield**
+
 ```bash
-# 在训练循环中每 5 分钟发送进度
-start_time=$(date +%s)
-while true; do
-    current_time=$(date +%s)
-    elapsed=$((current_time - start_time))
+# Start command
+exec(command, { yieldMs: 10000 })  # 10 seconds
 
-    if [ $((elapsed % 300)) -eq 0 ]; then
-        echo "📊 进度更新: 已运行 $((elapsed / 60)) 分钟"
-        # 发送消息到飞书
-    fi
+# Start background progress reporter
+# (使用定时器线程每 5 分钟发送一次)
 
-    # 执行任务...
-    sleep 10
-done
+# Poll frequently
+process poll (timeout: 5000)  # Every 5 seconds
+
+# Every 5 minutes, send progress
+if elapsed_time % 300 == 0:
+    message(action="send", message="📊 进度更新...")
+```
+
+**方式 3: Wrapper script with progress reporting**
+
+```bash
+#!/bin/bash
+# wrapper_with_progress.sh
+
+TASK_NAME="$1"
+COMMAND="$2"
+INTERVAL=300  # 5 minutes
+
+# Start progress reporter in background
+(
+    start_time=$(date +%s)
+    while kill -0 $$ 2>/dev/null; do
+        sleep $INTERVAL
+        elapsed=$(($(date +%s) - start_time))
+        minutes=$((elapsed / 60))
+
+        # Send progress message
+        openclaw message send --channel feishu -m "📊 进度更新: 已运行 ${minutes} 分钟"
+    done
+) &
+REPORTER_PID=$!
+
+# Execute command
+eval "$COMMAND"
+EXIT_CODE=$?
+
+# Stop reporter
+kill $REPORTER_PID 2>/dev/null
+
+exit $EXIT_CODE
 ```
 
 ### 适用于所有场景
 
-| 场景 | 汇报频率 | 汇报内容 |
-|------|---------|---------|
-| 模型下载 | 每 5 分钟 | 下载进度、已用时间、剩余时间 |
-| 训练任务 | 每 5 分钟 | 当前 step、loss、lr、预计完成时间 |
-| 环境安装 | 每 5 分钟 | 当前安装步骤、已用时间 |
-| 数据处理 | 每 5 分钟 | 处理进度、已用时间 |
-| Git 操作 | 每 5 分钟 | 当前操作、已用时间 |
+| 场景 | 汇报频率 | 汇报内容 | 实现方式 |
+|------|---------|---------|---------|
+| LeRobot 训练 | 每 5 分钟 | 当前 step、loss、lr | Cron job + 监控脚本 |
+| 模型下载 | 每 5 分钟 | 下载进度、已用时间 | Wrapper script |
+| 环境安装 | 每 5 分钟 | 当前安装步骤 | Progress reporter 类 |
+| 数据处理 | 每 5 分钟 | 处理进度、已用时间 | Wrapper script |
+| Git 操作 | 每 5 分钟 | 当前操作、已用时间 | Progress reporter 类 |
+| 文件传输 | 每 5 分钟 | 传输进度、速度 | Wrapper script |
+
+### 强制执行规则
+
+**对于 Agent：**
+- ✅ **任何任务 > 5 分钟**必须启动进度汇报
+- ✅ **每 5 分钟**发送一次进度消息
+- ✅ **任务完成后**停止汇报器
+- ❌ **禁止**让用户长时间等待无反馈
+
+**对于 Cron Job：**
+- ✅ 已部署 LeRobot 训练监控（Cron Job ID: 93385dee）
+- ✅ 每 5 分钟自动检查并发送进度
+- ✅ 适用于所有正在运行的训练任务
+
+### 检查清单
+
+**在执行任何任务前，确认：**
+- [ ] 任务预计时间 > 5 分钟？
+- [ ] 已启动进度汇报机制？
+- [ ] 汇报间隔设置为 300 秒（5 分钟）？
+- [ ] 消息发送到正确的飞书频道？
+
+**任务完成后，确认：**
+- [ ] 已停止进度汇报器
+- [ ] 发送了任务完成消息
 
 ---
 

@@ -1185,3 +1185,169 @@ openclaw cron run 93385dee-309f-42e9-b516-7c019c516d49
 
 **Last Updated**: 2026-03-19 16:15
 **Next Review**: 下次启动训练任务时验证
+
+---
+
+## 🔧 飞书机器人不回复消息 - 配置修复 (2026-03-19 16:25)
+
+### 问题现象
+
+用户反馈：**"在飞书窗口里面发了三四条消息，飞书机器人一条消息都没回复"**
+
+### 问题根源
+
+**飞书配置问题：**
+
+**之前的配置：**
+```json
+{
+  "channels": {
+    "feishu": {
+      "accounts": {
+        "default": {
+          "dmPolicy": "pairing"  // ❌ 需要配对才能私聊
+        }
+      }
+    }
+  }
+}
+```
+
+**问题分析：**
+
+`dmPolicy: "pairing"` 意味着：
+- ✅ 已配对用户可以正常私聊
+- ❌ 未配对用户发送的消息会被忽略
+- ❌ 机器人不会回复任何消息
+
+**为什么会这样？**
+
+OpenClaw 飞书插件的配对策略（dmPolicy）有以下选项：
+
+| 策略 | 说明 | 适用场景 |
+|------|------|----------|
+| `"open"` | 允许所有用户私聊 | 公共机器人、服务型机器人 |
+| `"pairing"` | 需要先配对才能私聊 | 私有机器人、企业内部机器人 |
+| `"deny"` | 禁止所有私聊 | 只允许群聊 |
+
+### 解决方案
+
+**修改配置为开放模式：**
+
+```python
+import json
+
+# 读取配置
+with open('/root/.openclaw/openclaw.json', 'r') as f:
+    config = json.load(f)
+
+# 修改飞书配置
+if 'channels' in config and 'feishu' in config['channels']:
+    if 'accounts' in config['channels']['feishu']:
+        config['channels']['feishu']['accounts']['default']['dmPolicy'] = 'open'
+
+    # 删除根级别的重复键
+    if 'dmPolicy' in config['channels']['feishu']:
+        del config['channels']['feishu']['dmPolicy']
+
+# 保存配置
+with open('/root/.openclaw/openclaw.json', 'w') as f:
+    json.dump(config, f, indent=2)
+```
+
+**验证配置：**
+```bash
+openclaw config get channels.feishu.accounts.default.dmPolicy
+# 应该返回: "open"
+```
+
+**重启 Gateway：**
+```bash
+# 方法 1: 使用 openclaw 命令（如果 systemd 可用）
+openclaw gateway restart
+
+# 方法 2: 手动重启（如果没有 systemd）
+pkill -f "openclaw gateway"
+nohup openclaw gateway > /tmp/gateway.log 2>&1 &
+```
+
+### 修复后的配置
+
+**现在的配置：**
+```json
+{
+  "channels": {
+    "feishu": {
+      "accounts": {
+        "default": {
+          "dmPolicy": "open"  // ✅ 允许所有用户私聊
+        }
+      }
+    }
+  }
+}
+```
+
+### 验证方法
+
+**如何确认修复成功：**
+
+1. **检查配置：**
+   ```bash
+   openclaw config get channels.feishu.accounts.default.dmPolicy
+   # 应该返回: "open"
+   ```
+
+2. **发送测试消息：**
+   - 在飞书中给机器人发送 "你好"
+   - 应该立即收到回复
+
+3. **检查日志：**
+   ```bash
+   tail -f /tmp/openclaw/openclaw-2026-03-19.log | grep -i "feishu"
+   # 应该看到消息处理日志
+   ```
+
+### 其他可能的问题
+
+**如果修改配置后仍然不回复：**
+
+1. **检查 Gateway 是否运行：**
+   ```bash
+   openclaw gateway status
+   ```
+
+2. **检查飞书 App ID 和 Secret：**
+   ```bash
+   openclaw config get channels.feishu.accounts.default.appId
+   openclaw config get channels.feishu.accounts.default.appSecret
+   ```
+
+3. **检查网络连接：**
+   - 飞书 Webhook 是否可访问
+   - 是否有防火墙阻止
+
+4. **查看详细日志：**
+   ```bash
+   tail -100 /tmp/openclaw/openclaw-2026-03-19.log
+   ```
+
+### 教训和经验
+
+**问题诊断流程：**
+
+1. ✅ **检查配置** - 确认 dmPolicy 不是 "pairing"
+2. ✅ **检查 Gateway 状态** - 确认 Gateway 正在运行
+3. ✅ **检查日志** - 查看是否有错误消息
+4. ✅ **测试连接** - 发送测试消息验证
+
+**最佳实践：**
+
+- 对于公共机器人，使用 `dmPolicy: "open"`
+- 对于私有机器人，使用 `dmPolicy: "pairing"` 并提供配对指南
+- 定期检查 Gateway 日志，及早发现问题
+
+---
+
+**Last Updated**: 2026-03-19 16:30
+**Next Review**: 下次飞书机器人不回复时

@@ -1,12 +1,16 @@
 ---
 name: remote-lerobot-eval
 description: >
-  Remote execution and monitoring of lerobot evaluation tasks via jump server with tmux session management.
-  Use when: (1) Running lerobot evaluation on remote machines behind jump server, (2) Need to visualize
-  robot evaluation UI and terminal windows, (3) Managing multi-machine workflows with SSH tunneling,
-  (4) Setting up persistent terminal sessions for long-running evaluation tasks, (5) User mentions
-  "remote evaluation", "jump server", "tmux", "lerobot evaluate", "robot testing".
-  Trigger phrases: "remote evaluation", "通过跳板机评估", "远程机器人测试", "tmux session".
+  Remote execution and monitoring of lerobot evaluation and inference tasks via jump server with tmux session management.
+  Use when: (1) Running lerobot evaluation on remote machines behind jump server, (2) Running lerobot inference
+  on remote machines, (3) Need to visualize robot evaluation UI and terminal windows, (4) Managing multi-machine
+  workflows with SSH tunneling, (5) Setting up persistent terminal sessions for long-running evaluation/inference
+  tasks, (6) User mentions "推理", "开始推理", "运行推理", "inference", "remote evaluation", "jump server", "tmux",
+  "lerobot evaluate", "lerobot inference", "robot testing".
+  Trigger phrases: "推理", "开始推理", "运行推理", "执行推理", "inference", "remote evaluation", "通过跳板机评估",
+  "远程机器人测试", "tmux session", "lerobot 推理".
+
+  **CRITICAL: When user mentions "推理", "开始推理", or any inference-related keywords, MUST activate this skill FIRST.**
 
   MANDATORY: Execute steps in strict order. Stop on any error.
 metadata:
