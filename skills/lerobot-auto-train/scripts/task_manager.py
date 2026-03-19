@@ -74,7 +74,7 @@ class TaskManager:
         priority: int = 5,
         proxy: Optional[str] = None,
         hf_token: Optional[str] = None,
-        conda_env: str = "ly_robot",
+        conda_env: str = "lerobot",
         job_name: Optional[str] = None,
         dry_run: bool = False,
         model_repo_id: Optional[str] = None,  # User-selected model to download (e.g., "lerobot/smolvla_base")
@@ -173,7 +173,7 @@ class TaskManager:
         task_meta: Dict,
         proxy: Optional[str] = None,
         hf_token: Optional[str] = None,
-        conda_env: str = "ly_robot"
+        conda_env: str = "lerobot"
     ) -> Dict:
         """Show configuration preview in dry-run mode."""
         config = task_meta["config"]
@@ -253,7 +253,7 @@ class TaskManager:
         task_meta: Dict,
         proxy: Optional[str] = None,
         hf_token: Optional[str] = None,
-        conda_env: str = "ly_robot"
+        conda_env: str = "lerobot"
     ) -> None:
         """Start task in background process."""
         # Create log file
@@ -353,7 +353,7 @@ class TaskManager:
         task_meta: Dict,
         proxy: Optional[str] = None,
         hf_token: Optional[str] = None,
-        conda_env: str = "ly_robot"
+        conda_env: str = "lerobot"
     ) -> str:
         """Build lerobot_train command."""
         config = task_meta["config"]
@@ -552,7 +552,7 @@ def main():
     submit_parser.add_argument("--job-name")
     submit_parser.add_argument("--proxy", help="Proxy URL (e.g., http://127.0.0.1:10809)")
     submit_parser.add_argument("--hf-token", help="HuggingFace token")
-    submit_parser.add_argument("--conda-env", default="ly_robot")
+    submit_parser.add_argument("--conda-env", default="lerobot")
     submit_parser.add_argument("--priority", type=int, default=5)
     submit_parser.add_argument("--background", action="store_true", default=True)
     submit_parser.add_argument("--dry-run", action="store_true", help="Show configuration without executing")

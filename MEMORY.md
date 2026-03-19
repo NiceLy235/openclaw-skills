@@ -924,3 +924,132 @@ python -m lerobot.scripts.lerobot_train ...
 
 **Last Updated**: 2026-03-19 14:35
 **Next Review**: 下次执行 LeRobot 训练时
+
+---
+
+## ⏰ 飞书机器人 - 每 5 分钟汇报规则 (2026-03-19 15:40)
+
+### 需求背景
+
+用户反馈：**"在执行任何命令的时候，飞书机器人必须每五分钟汇报一次进度"**
+
+### 实现方案
+
+**更新 FEISHU_RULES.md 和 AGENTS.md，添加"每 5 分钟汇报"强制规则：**
+
+#### 新增规则
+
+1. **五分钟汇报规则（强制）**
+   - ⏰ 每 5 分钟必须发送一次进度消息
+   - 适用于所有长时间运行的任务（>5 分钟）
+
+2. **进度消息必须包含**
+   - 当前执行的步骤
+   - 已用时间
+   - 预计剩余时间（如果可知）
+   - 当前状态（运行中/等待中/错误恢复中）
+
+3. **标准进度消息格式**
+   ```
+   📊 进度更新 (5 分钟汇报)
+   ━━━━━━━━━━━━━━━━━━━━━━━━
+   • 当前步骤: Step 3/5 - 下载模型
+   • 已用时间: 10 分钟
+   • 预计剩余: 约 15 分钟
+   • 状态: ⏳ 正在下载 (45%)
+   ━━━━━━━━━━━━━━━━━━━━━━━━
+   ```
+
+### 实现方式
+
+**方式 1: 使用后台定时器（推荐）**
+```python
+import threading
+import time
+
+class ProgressReporter:
+    def __init__(self, channel="feishu"):
+        self.channel = channel
+        self.running = False
+        self.thread = None
+
+    def start(self):
+        self.running = True
+        self.thread = threading.Thread(target=self._report_loop)
+        self.thread.daemon = True
+        self.thread.start()
+
+    def _report_loop(self):
+        while self.running:
+            time.sleep(300)  # 5 分钟
+            if self.running:
+                self._send_progress()
+
+    def _send_progress(self):
+        # 发送进度消息到飞书
+        message(action="send", message="📊 进度更新...")
+
+    def stop(self):
+        self.running = False
+
+# 使用
+reporter = ProgressReporter()
+reporter.start()
+
+# 执行长时间任务
+long_running_task()
+
+# 停止汇报
+reporter.stop()
+```
+
+**方式 2: 在长时间命令中定期检查**
+```bash
+# 在训练循环中每 5 分钟发送进度
+start_time=$(date +%s)
+while true; do
+    current_time=$(date +%s)
+    elapsed=$((current_time - start_time))
+
+    if [ $((elapsed % 300)) -eq 0 ]; then
+        echo "📊 进度更新: 已运行 $((elapsed / 60)) 分钟"
+        # 发送消息到飞书
+    fi
+
+    # 执行任务...
+    sleep 10
+done
+```
+
+### 适用场景
+
+| 场景 | 汇报频率 | 汇报内容 |
+|------|---------|---------|
+| 模型下载 | 每 5 分钟 | 下载进度、已用时间、剩余时间 |
+| 训练任务 | 每 5 分钟 | 当前 step、loss、lr、预计完成时间 |
+| 环境安装 | 每 5 分钟 | 当前安装步骤、已用时间 |
+| 数据处理 | 每 5 分钟 | 处理进度、已用时间 |
+| Git 操作 | 每 5 分钟 | 当前操作、已用时间 |
+
+### 更新的文件
+
+- `FEISHU_RULES.md` - 添加"五分钟汇报规则"详细说明
+- `AGENTS.md` - 更新"飞书操作 - 实时反馈"部分
+
+### 执行规则
+
+**强制执行：**
+- ❌ 超过 5 分钟不发送任何进度更新 → 违反规则
+- ✅ 每 5 分钟发送一次进度消息 → 符合要求
+
+### 为什么重要
+
+- ✅ 防止"机器人卡住"的误解
+- ✅ 用户清楚知道任务进度
+- ✅ 长时间任务也有持续反馈
+- ✅ 提升用户体验
+
+---
+
+**Last Updated**: 2026-03-19 15:45
+**Next Review**: 下次执行飞书长时间任务时

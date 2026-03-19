@@ -95,7 +95,7 @@ def merge_episodes_with_lerobot(
     episodes_dir: Path,
     repo_id: str,
     push_to_hub: bool = False,
-    conda_env: str = "ly_robot",
+    conda_env: str = "lerobot",
     proxy: Optional[str] = None
 ) -> bool:
     """
@@ -396,14 +396,14 @@ def main():
     merge_parser.add_argument("--episodes-dir", required=True, help="Directory with episodes to merge")
     merge_parser.add_argument("--repo-id", required=True, help="Target repo ID (e.g., ly/train_merged)")
     merge_parser.add_argument("--push-to-hub", action="store_true")
-    merge_parser.add_argument("--conda-env", default="ly_robot")
+    merge_parser.add_argument("--conda-env", default="lerobot")
     merge_parser.add_argument("--proxy", help="Proxy URL (e.g., http://127.0.0.1:10809)")
     
     # Full pipeline command
     full_parser = subparsers.add_parser("full", help="Full pipeline: merge all episodes")
     full_parser.add_argument("--data-dir", required=True, help="Directory with raw episodes")
     full_parser.add_argument("--repo-prefix", default="train", help="Repo ID prefix")
-    full_parser.add_argument("--conda-env", default="ly_robot")
+    full_parser.add_argument("--conda-env", default="lerobot")
     full_parser.add_argument("--proxy", help="Proxy URL")
     
     args = parser.parse_args()

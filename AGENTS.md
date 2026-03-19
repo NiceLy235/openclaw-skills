@@ -494,7 +494,8 @@ For ANY multi-step Feishu operation (doc operations, wiki navigation, drive mana
 
 1. **IMMEDIATE START**: Send "🚀 开始执行任务..." BEFORE first API call
 2. **STEP-BY-STEP**: Send progress update after EACH step completion
-3. **COMPLETION**: Send final summary with results
+3. **EVERY 5 MINUTES**: Send progress update for long-running tasks ⭐ **NEW**
+4. **COMPLETION**: Send final summary with results
 
 ### Standard Message Format
 
@@ -504,6 +505,15 @@ For ANY multi-step Feishu operation (doc operations, wiki navigation, drive mana
 
 # Progress (after each step)
 ✅ 步骤 X/Y 完成：[步骤描述]
+
+# Progress (every 5 minutes for long tasks)
+📊 进度更新 (5 分钟汇报)
+━━━━━━━━━━━━━━━━━━━━━━━━
+• 当前步骤: Step 3/5 - 下载模型
+• 已用时间: 10 分钟
+• 预计剩余: 约 15 分钟
+• 状态: ⏳ 正在下载 (45%)
+━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Completion
 ✅ 全部完成！[结果摘要]
@@ -522,12 +532,29 @@ For ANY multi-step Feishu operation (doc operations, wiki navigation, drive mana
 8️⃣ [Send Message] 🎉 全部完成！Wiki 页面已创建
 ```
 
+### ⏰ Five-Minute Report Rule (强制) ⭐ **NEW**
+
+**适用于所有长时间运行的任务（>5 分钟）：**
+
+- ⏰ **每 5 分钟**必须发送一次进度消息
+- 📊 进度消息必须包含：
+  - 当前执行的步骤
+  - 已用时间
+  - 预计剩余时间（如果可知）
+  - 当前状态（运行中/等待中/错误恢复中）
+
+**实现方式：**
+- 使用后台定时器线程（推荐）
+- 或在长时间命令中定期检查并发送消息
+- 参考 `FEISHU_RULES.md` 中的实现示例
+
 ### Enforcement Rules
 
 - **NEVER** execute >3 Feishu API calls without at least one progress message
 - **ALWAYS** send start message before first API call
 - **ALWAYS** send completion message after last API call
 - **ALWAYS** report errors immediately with recovery attempt
+- **ALWAYS** send progress update every 5 minutes for long tasks ⭐ **NEW**
 
 ### Why This Matters
 
@@ -535,6 +562,7 @@ For ANY multi-step Feishu operation (doc operations, wiki navigation, drive mana
 - ✅ User can see which step is executing
 - ✅ Better experience for long-running operations
 - ✅ Follows "Long-Running Commands - Real-Time Feedback" principle
+- ✅ Prevents "卡住" perception for long tasks ⭐ **NEW**
 
 **This rule applies to ALL Feishu operations, regardless of which skill is active or whether it's a new session.**
 

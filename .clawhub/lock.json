@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": {
+    "skill-vetter": {
+      "version": "1.0.0",
+      "installedAt": 1773903495472
+    },
+    "security-scanner": {
+      "version": "1.0.0",
+      "installedAt": 1773903693298
+    },
+    "capability-evolver": {
+      "version": "1.32.2",
+      "installedAt": 1773903723179
+    },
+    "agent-browser": {
+      "version": "0.2.0",
+      "installedAt": 1773903760579
+    },
+    "self-improving": {
+      "version": "1.2.16",
+      "installedAt": 1773903777222
+    }
+  }
+}
