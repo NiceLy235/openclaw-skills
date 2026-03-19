@@ -1351,3 +1351,135 @@ nohup openclaw gateway > /tmp/gateway.log 2>&1 &
 
 **Last Updated**: 2026-03-19 16:30
 **Next Review**: 下次飞书机器人不回复时
+
+---
+
+## 🔌 Remote Lerobot Eval Skill - 触发词更新 (2026-03-19 17:44)
+
+### 需求背景
+
+用户反馈：**"更新一下 remote-lerobot-eval skill，当使用推理，开始推理等字眼的时候，就调用该 skill"**
+
+### 实施方案
+
+**更新 skill description，添加推理相关触发词：**
+
+#### 新增触发词
+
+**中文触发词：**
+- "推理"
+- "开始推理"
+- "运行推理"
+- "执行推理"
+- "lerobot 推理"
+- "通过跳板机推理"
+
+**英文触发词：**
+- "inference"
+- "lerobot inference"
+- "start inference"
+- "run inference"
+
+#### 更新后的 description
+
+```yaml
+description: >
+  Remote execution and monitoring of lerobot evaluation tasks via jump server with tmux session management.
+  Use when: (1) Running lerobot evaluation on remote machines behind jump server, (2) Need to visualize
+  robot evaluation UI and terminal windows, (3) Managing multi-machine workflows with SSH tunneling,
+  (4) Setting up persistent terminal sessions for long-running evaluation tasks, (5) User mentions
+  "推理", "开始推理", "运行推理", "执行推理", "inference", "lerobot inference", "robot testing".
+  Trigger phrases: "推理", "开始推理", "运行推理", "执行推理", "inference", "remote evaluation",
+  "通过跳板机评估", "远程机器人测试", "tmux session", "lerobot 推理".
+
+  **CRITICAL: When user mentions "推理", "开始推理", or any inference-related keywords,
+  MUST activate this skill FIRST.**
+```
+
+### 触发规则
+
+**当用户消息包含以下关键词时，自动激活该 skill：**
+
+| 关键词类型 | 触发词 |
+|-----------|--------|
+| 中文 - 推理 | 推理, 开始推理, 运行推理, 执行推理, lerobot 推理 |
+| 英文 - Inference | inference, lerobot inference, start inference, run inference |
+| 中文 - 评估 | 远程评估, 通过跳板机评估, 远程机器人测试 |
+| 英文 - Evaluation | remote evaluation, robot testing, lerobot evaluate |
+
+### Skill 功能
+
+**该 skill 提供：**
+
+1. **远程推理执行**
+   - 通过跳板机连接到远程机器
+   - 在远程机器上运行 lerobot inference
+   - 自动设置 SSH 隧道
+
+2. **持久会话管理**
+   - 使用 tmux 创建持久会话
+   - 防止 SSH 断开导致任务中断
+   - 支持重新连接到运行中的会话
+
+3. **可视化监控**
+   - 显示机器人评估 UI
+   - 实时查看推理进度
+   - 终端窗口管理
+
+4. **进度报告**
+   - 每 30 秒报告评估进度
+   - 实时状态更新
+   - 错误自动报告
+
+### 使用场景
+
+**适用于：**
+
+- ✅ 在远程机器上运行 lerobot inference
+- ✅ 需要通过跳板机访问远程机器
+- ✅ 长时间运行的推理任务
+- ✅ 需要可视化机器人评估结果
+- ✅ 需要持久会话防止断开
+
+**不适用于：**
+
+- ❌ 本地机器上的推理（使用 lerobot-auto-train skill）
+- ❌ 训练任务（使用 lerobot-auto-train skill）
+
+### 验证方法
+
+**如何确认 skill 触发：**
+
+1. 在飞书中发送 "开始推理"
+2. Agent 应该自动激活 `remote-lerobot-eval` skill
+3. 开始执行远程推理流程
+
+**手动激活：**
+```bash
+# 如果自动触发失败，可以手动指定
+"使用 remote-lerobot-eval skill 开始推理"
+```
+
+### 更新的文件
+
+- `skills/remote-lerobot-eval/SKILL.md`
+  - 更新 description 添加推理触发词
+  - 添加 CRITICAL 提示，优先激活
+
+### 注意事项
+
+**触发优先级：**
+
+1. **推理相关** → `remote-lerobot-eval` skill
+2. **训练相关** → `lerobot-auto-train` skill
+3. **环境相关** → `env-setup` skill
+
+**冲突处理：**
+
+- 如果用户说 "训练并推理"，优先激活 `lerobot-auto-train`
+- 如果用户只说 "推理"，激活 `remote-lerobot-eval`
+
+---
+
+**Last Updated**: 2026-03-19 17:48
+**Next Review**: 下次用户使用推理功能时
