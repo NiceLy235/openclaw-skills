@@ -1053,3 +1053,135 @@ done
 
 **Last Updated**: 2026-03-19 15:45
 **Next Review**: 下次执行飞书长时间任务时
+
+---
+
+## ⏰ LeRobot 训练进度监控 - 实际部署 (2026-03-19 16:09)
+
+### 部署方案
+
+**使用 OpenClaw Cron Job 实现每5分钟进度汇报：**
+
+#### Cron Job 配置
+
+```json
+{
+  "name": "LeRobot 训练进度监控",
+  "schedule": {
+    "kind": "every",
+    "everyMs": 300000  // 5分钟
+  },
+  "payload": {
+    "kind": "agentTurn",
+    "message": "检查是否有正在运行的 LeRobot 训练任务...",
+    "model": "glm-5",
+    "thinking": "low"
+  },
+  "delivery": {
+    "mode": "announce",
+    "channel": "feishu"
+  },
+  "sessionTarget": "isolated",
+  "enabled": true
+}
+```
+
+#### 监控脚本
+
+**monitor_training.py 功能：**
+- 检查 `~/.openclaw/tasks/` 中的所有任务
+- 筛选状态为 "training" 或 "preparing_data" 的任务
+- 从日志文件解析训练进度（step, loss, lr）
+- 计算已用时间
+- 输出格式化的进度消息
+
+**进度消息格式：**
+```
+📊 训练进度更新 (16:09:23)
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+• 任务 ID: train_20260319_160923_abc123
+• 状态: training
+• 已用时间: 15分钟
+• Step: 1500
+• Loss: 0.0684
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+#### 实现细节
+
+**创建的文件：**
+1. `skills/lerobot-auto-train/scripts/monitor_training.py` - 进度监控脚本
+2. `skills/lerobot-auto-train/scripts/progress_reporter.py` - 后台汇报器（备用）
+3. `skills/lerobot-auto-train/scripts/check_training_progress.py` - 进度检查脚本（备用）
+
+**部署步骤：**
+```bash
+# 1. 创建 cron job（已完成）
+openclaw cron add ...
+
+# 2. 验证 cron job
+openclaw cron list
+
+# 3. 手动触发测试
+openclaw cron run <job_id>
+
+# 4. 查看运行记录
+openclaw cron runs <job_id>
+```
+
+#### Cron Job ID
+
+**ID:** `93385dee-309f-42e9-b516-7c019c516d49`
+**名称:** LeRobot 训练进度监控
+**频率:** 每 5 分钟
+**下次运行:** 创建后 5 分钟
+**状态:** enabled
+
+#### 为什么之前没有工作？
+
+**问题根源：**
+1. ❌ 只更新了规则文档（FEISHU_RULES.md, AGENTS.md）
+2. ❌ 没有实际创建监控机制
+3. ❌ 没有部署 cron job
+
+**解决方案：**
+1. ✅ 创建了监控脚本 `monitor_training.py`
+2. ✅ 部署了 OpenClaw cron job
+3. ✅ 设置为每 5 分钟自动运行
+
+#### 验证方法
+
+**如何确认监控在工作：**
+1. 提交一个训练任务
+2. 等待 5 分钟
+3. 检查飞书是否收到进度更新
+4. 或运行 `openclaw cron runs <job_id>` 查看运行记录
+
+**手动测试：**
+```bash
+# 运行监控脚本
+python3 ~/.openclaw/workspace/skills/lerobot-auto-train/scripts/monitor_training.py
+
+# 手动触发 cron job
+openclaw cron run 93385dee-309f-42e9-b516-7c019c516d49
+```
+
+#### 适用场景
+
+- ✅ LeRobot 训练任务（自动监控）
+- ✅ 长时间运行的后台任务
+- ✅ 需要定期进度汇报的场景
+
+#### 优点
+
+- ✅ **自动化**: 无需手动干预，自动每5分钟汇报
+- ✅ **可靠性**: 使用 OpenClaw 内置 cron，稳定可靠
+- ✅ **可扩展**: 可以添加更多监控逻辑
+- ✅ **可管理**: 可以随时启用/禁用/修改 cron job
+
+---
+
+**Last Updated**: 2026-03-19 16:15
+**Next Review**: 下次启动训练任务时验证

@@ -16,11 +16,12 @@ import signal
 import subprocess
 import sys
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 import time
+import threading
 
 
 class TaskStatus(Enum):
@@ -266,6 +267,7 @@ class TaskManager:
         # Find download_model.py script (same directory as this script)
         script_dir = Path(__file__).parent
         download_script = script_dir / "download_model.py"
+        progress_reporter_script = script_dir / "progress_reporter.py"
         
         # Get user-selected model from config
         config = task_meta["config"]
@@ -294,7 +296,17 @@ class TaskManager:
             
             # Working directory
             f.write(f"cd {self.lerobot_dir}\n\n")
-            
+
+            # CRITICAL: Start progress reporter (every 5 minutes) ⭐ NEW
+            if progress_reporter_script.exists():
+                f.write("# Step 0: Start progress reporter (5-minute updates)\n")
+                f.write("echo '🔍 Starting progress reporter...'\n")
+                progress_cmd = f"python3 {progress_reporter_script} --task-id {task_id} --log-file {log_file} --channel feishu --interval 300"
+                f.write(f"{progress_cmd} &\n")
+                f.write("PROGRESS_PID=$!\n")
+                f.write(f"echo '✅ Progress reporter started (PID: $PROGRESS_PID)'\n")
+                f.write("echo ''\n\n")
+
             # CRITICAL: Download model ONLY if user selected one (on-demand download)
             if model_repo_id and download_script.exists():
                 f.write("# Step 1: Download selected model from GitCode or HuggingFace\n")
@@ -324,7 +336,21 @@ class TaskManager:
             f.write("echo '🚀 Step 2: Starting training...'\n")
             f.write("echo '========================================'\n")
             f.write(cmd + "\n")
-        
+            f.write("TRAIN_EXIT_CODE=$?\n\n")
+
+            # CRITICAL: Stop progress reporter after training completes ⭐ NEW
+            if progress_reporter_script.exists():
+                f.write("# Stop progress reporter\n")
+                f.write("if [ -n \"$PROGRESS_PID\" ]; then\n")
+                f.write("  echo ''\n")
+                f.write("  echo '🛑 Stopping progress reporter...'\n")
+                f.write("  kill $PROGRESS_PID 2>/dev/null || true\n")
+                f.write("  echo '✅ Progress reporter stopped'\n")
+                f.write("fi\n\n")
+
+            # Exit with training exit code
+            f.write("exit $TRAIN_EXIT_CODE\n")
+
         os.chmod(script_file, 0o755)
 
         # Launch process
