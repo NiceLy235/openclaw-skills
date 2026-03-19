@@ -304,7 +304,7 @@ class TaskManager:
                 progress_cmd = f"python3 {progress_reporter_script} --task-id {task_id} --log-file {log_file} --channel feishu --interval 300"
                 f.write(f"{progress_cmd} &\n")
                 f.write("PROGRESS_PID=$!\n")
-                f.write(f"echo '✅ Progress reporter started (PID: $PROGRESS_PID)'\n")
+                f.write("echo '✅ Progress reporter started'\n")
                 f.write("echo ''\n\n")
 
             # CRITICAL: Download model ONLY if user selected one (on-demand download)
