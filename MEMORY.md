@@ -787,3 +787,140 @@ cat ~/.openclaw/tasks/<task_id>/training_<task_id>.log | grep "Step 1"
 
 **Last Updated**: 2026-03-18 15:12
 **Next Review**: 下次执行 LeRobot 训练时
+
+---
+
+## 🤖 LeRobot 训练 - 按需下载模型 (2026-03-19 14:29)
+
+### 需求背景
+
+用户反馈：**"我还需要调整一下流程，必须在用户在训练参数选择模型后，才开始下载对应模型，没有就不下载，不能提前下载所有模型"**
+
+### 实现方案
+
+**修改 `task_manager.py`，添加 `--model-repo-id` 参数：**
+
+#### 新增参数
+
+```python
+model_repo_id: Optional[str] = None  # User-selected model to download (e.g., "lerobot/smolvla_base")
+```
+
+#### 新的下载逻辑
+
+**修改前（硬编码所有模型）：**
+```python
+# 根据policy_type自动确定要下载的所有模型
+if policy_type == "smolvla":
+    model_repo_ids.append("lerobot/smolvla_base")
+    model_repo_ids.append("HuggingFaceTB/SmolVLM2-500M-Video-Instruct")
+elif policy_type == "pi0":
+    model_repo_ids.append("lerobot/pi05_base")
+```
+
+**修改后（按需下载）：**
+```python
+# 只下载用户选择的模型
+model_repo_id = config.get("model_repo_id")  # 从用户输入获取
+
+if model_repo_id:
+    # 只下载用户指定的模型
+    download_cmd = f"python {download_script} --repo-id {model_repo_id}"
+    # ...
+else:
+    # 跳过下载，使用缓存或从头训练
+    echo 'ℹ️  No model selected for download'
+```
+
+### 命令行使用
+
+**示例 1: 不下载模型（使用缓存）**
+```bash
+python scripts/task_manager.py submit \
+  --dataset-repo-id train/merged \
+  --model-name smolvla_base \
+  --batch-size 32 \
+  --steps 100000
+```
+
+**示例 2: 下载指定模型 ⭐ 推荐**
+```bash
+python scripts/task_manager.py submit \
+  --dataset-repo-id train/merged \
+  --model-name smolvla_base \
+  --model-repo-id lerobot/smolvla_base \
+  --batch-size 32 \
+  --steps 100000
+```
+
+### Wrapper Script 生成
+
+**生成的 `run_training.sh` 脚本：**
+
+```bash
+#!/bin/bash
+# Step 1: Download selected model from GitCode or HuggingFace
+if model_repo_id specified:
+    echo '🚀 Step 1: Downloading selected model...'
+    python download_model.py --repo-id lerobot/smolvla_base
+    if [ $? -ne 0 ]; then
+        echo '❌ Model download failed'
+        exit 1
+    fi
+else:
+    echo 'ℹ️  No model selected for download, using cached or training from scratch'
+
+# Step 2: Run training
+echo '🚀 Step 2: Starting training...'
+python -m lerobot.scripts.lerobot_train ...
+```
+
+### 用户交互流程
+
+**收集需求时：**
+1. **模型选择**: 使用什么模型？（默认: smolvla_base）
+2. **模型下载**: 是否需要下载预训练模型？⭐ NEW
+   - 如果需要，提供 `--model-repo-id`
+   - 如果不需要，跳过下载步骤
+3. **其他参数**: batch_size, steps, save_freq, dataset, proxy, hf_token
+
+**配置预览显示：**
+```
+🤖 模型配置:
+  • 模型: smolvla_base
+  • Policy Type: smolvla
+  • 预训练权重: lerobot/smolvla_base (将下载)  # 或 "无 (使用缓存或从头训练)"
+```
+
+### 优点
+
+✅ **按需下载**: 只下载用户选择的模型
+✅ **节省时间**: 不需要等待不必要的大文件下载
+✅ **灵活性**: 可以选择从头训练（不下载预训练权重）
+✅ **透明性**: 用户清楚知道会下载哪些模型
+
+### 已修改文件
+
+- `skills/lerobot-auto-train/scripts/task_manager.py`
+  - 添加 `--model-repo-id` 参数
+  - 修改 `_start_background_task()` 下载逻辑
+  - 更新 `_show_dry_run()` 显示
+  - 更新命令行参数解析
+
+- `skills/lerobot-auto-train/SKILL.md`
+  - 更新 Step 2: 收集用户需求（添加模型下载选择）
+  - 更新 Step 4: 配置预览命令示例
+  - 更新 Step 6: 提交训练任务说明
+  - 添加按需下载逻辑说明
+
+### 验证方法
+
+**下次训练时验证：**
+1. 不传 `--model-repo-id`: 训练应立即开始，无下载步骤
+2. 传入 `--model-repo-id lerobot/smolvla_base`: 训练前应下载该模型
+3. 检查日志中的 "Step 1" 输出，确认是否下载
+
+---
+
+**Last Updated**: 2026-03-19 14:35
+**Next Review**: 下次执行 LeRobot 训练时

@@ -254,6 +254,7 @@ Use this template for ANY training operation:
 - **Action**: Ask user for training parameters
 - **Required inputs**:
   - Model name (default: smolvla_base)
+  - **Model download**: 是否需要下载预训练模型？（如果选择，需提供 repo_id，如 `lerobot/smolvla_base`）
   - Dataset path or repo_id
   - Batch size, steps, save_freq
   - Proxy and HuggingFace token
@@ -304,14 +305,25 @@ python lerobot_edit_dataset.py \
 - **Action**: Generate complete training configuration
 - **Command**:
   ```bash
+  # 示例 1: 不下载预训练模型（使用缓存或从头训练）
   python scripts/task_manager.py submit \
     --dataset-repo-id train/merged \
     --model-name smolvla_base \
     --batch-size 32 \
     --steps 100000 \
     --dry-run
+
+  # 示例 2: 下载指定的预训练模型 ⭐ 推荐
+  python scripts/task_manager.py submit \
+    --dataset-repo-id train/merged \
+    --model-name smolvla_base \
+    --model-repo-id lerobot/smolvla_base \
+    --batch-size 32 \
+    --steps 100000 \
+    --dry-run
   ```
 - **Expected**: Full configuration displayed
+- **Note**: `--model-repo-id` 参数可选，如果指定则在训练前自动下载该模型
 **[Run command, display config to user]**
 
 ### Step 5: Wait for User Confirmation
@@ -331,30 +343,36 @@ python lerobot_edit_dataset.py \
 
 ### Step 6: Submit Training Task
 - **Action**: Submit training task (only after user confirmation)
-- **Pre-flight**: Download model from HuggingFace (with mirror fallback)
+- **Pre-flight**: Download model if `--model-repo-id` specified (with mirror fallback)
 - **Command**:
   ```bash
-  # Step 6.1: Download model (自动尝试 huggingface.co → hf-mirror.com)
-  python scripts/download_model.py \
-    --repo-id lerobot/smolvla_base \
-    --proxy http://127.0.0.1:10809 \
-    --timeout 300
-  
-  # Step 6.2: Submit training task
+  # Step 6.1: 提交训练任务（如果指定了 --model-repo-id，会自动下载）
   python scripts/task_manager.py submit \
     --dataset-repo-id train/merged \
     --model-name smolvla_base \
+    --model-repo-id lerobot/smolvla_base \
     --batch-size 32 \
     --steps 100000 \
     --proxy http://127.0.0.1:10809 \
     --hf-token YOUR_TOKEN
   ```
 - **Expected**: 
-  - Model downloaded successfully
+  - If `--model-repo-id` specified: Model downloaded automatically before training
+  - If not specified: Training starts immediately (uses cache or trains from scratch)
   - Task ID returned, training started
 **[Run command, verify, report task ID]**
 
-**Note:** `download_model.py` 会自动处理：
+**按需下载逻辑：**
+- ✅ **用户选择模型** (`--model-repo-id lerobot/smolvla_base`): 训练前自动下载该模型
+- ✅ **用户不选择** (不传 `--model-repo-id`): 跳过下载，使用缓存或从头训练
+- ⚠️ **重要**: 不会提前下载所有模型，只下载用户指定的模型
+
+**模型下载流程（如果指定了 `--model-repo-id`）：**
+1. **优先尝试 GitCode**（中国用户专属镜像）⭐ 推荐
+2. **失败后尝试 huggingface.co**（官方源）
+3. **最后尝试 hf-mirror.com**（中国镜像）
+
+`download_model.py` 会自动处理：
 1. 尝试从 `huggingface.co` 下载
 2. 如果失败或超时，自动切换到 `hf-mirror.com` 镜像站
 3. 使用代理（如果配置）
@@ -492,9 +510,13 @@ huggingface-cli download lerobot/smolvla_base
 
 询问用户：
 1. **模型选择**: 使用什么模型？（默认: smolvla_base）
-2. **训练参数**: batch_size, steps, save_freq 等
-3. **数据集**: 数据集路径或已合并的 repo_id
-4. **其他配置**: 代理、HuggingFace Token 等
+2. **模型下载**: 是否需要下载预训练模型？⭐ NEW
+   - 如果需要，提供模型 repo_id（如 `lerobot/smolvla_base`）
+   - 如果不需要，训练时使用缓存或从头训练
+   - **不会提前下载所有模型，按需下载**
+3. **训练参数**: batch_size, steps, save_freq 等
+4. **数据集**: 数据集路径或已合并的 repo_id
+5. **其他配置**: 代理、HuggingFace Token 等
 
 ### 步骤 2: 生成配置预览
 

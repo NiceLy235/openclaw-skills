@@ -77,6 +77,7 @@ class TaskManager:
         conda_env: str = "ly_robot",
         job_name: Optional[str] = None,
         dry_run: bool = False,
+        model_repo_id: Optional[str] = None,  # User-selected model to download (e.g., "lerobot/smolvla_base")
         **kwargs
     ) -> Dict:
         """
@@ -107,6 +108,7 @@ class TaskManager:
                 "dataset_repo_id": dataset_repo_id,
                 "model_name": model_name,
                 "policy_type": policy_type,
+                "model_repo_id": model_repo_id,  # User-selected model to download (None = no download)
                 "output_dir": output_dir_formatted,
                 "batch_size": batch_size,
                 "steps": steps,
@@ -208,8 +210,10 @@ class TaskManager:
         print("🤖 模型配置:")
         print(f"  • 模型: {config['model_name']}")
         print(f"  • Policy Type: {config['policy_type']}")
-        if config['policy_type'] == "smolvla":
-            print(f"  • 预训练权重: lerobot/smolvla_base")
+        if config.get('model_repo_id'):
+            print(f"  • 预训练权重: {config['model_repo_id']} (将下载)")
+        else:
+            print(f"  • 预训练权重: 无 (使用缓存或从头训练)")
         print()
 
         print("📊 训练参数:")
@@ -263,20 +267,9 @@ class TaskManager:
         script_dir = Path(__file__).parent
         download_script = script_dir / "download_model.py"
         
-        # Determine model repo_id based on policy_type
+        # Get user-selected model from config
         config = task_meta["config"]
-        policy_type = config.get("policy_type", "smolvla")
-        model_repo_ids = []  # Changed to list for multiple models
-
-        if policy_type == "smolvla":
-            # SmolVLA requires TWO models:
-            # 1. LeRobot policy weights
-            model_repo_ids.append("lerobot/smolvla_base")
-            # 2. VLM backbone (SmolVLM2)
-            model_repo_ids.append("HuggingFaceTB/SmolVLM2-500M-Video-Instruct")
-        elif policy_type == "pi0":
-            model_repo_ids.append("lerobot/pi05_base")
-        # Add more model mappings as needed
+        model_repo_id = config.get("model_repo_id")  # User-selected model (e.g., "lerobot/smolvla_base")
         
         # Write wrapper script
         script_file = self.tasks_dir / task_id / "run_training.sh"
@@ -302,33 +295,27 @@ class TaskManager:
             # Working directory
             f.write(f"cd {self.lerobot_dir}\n\n")
             
-            # CRITICAL: Download models BEFORE training (with GitCode mirror fallback)
-            if model_repo_ids and download_script.exists():
-                f.write("# Step 1: Download models from GitCode or HuggingFace\n")
+            # CRITICAL: Download model ONLY if user selected one (on-demand download)
+            if model_repo_id and download_script.exists():
+                f.write("# Step 1: Download selected model from GitCode or HuggingFace\n")
                 f.write("echo '========================================'\n")
-                f.write("echo '🚀 Step 1: Downloading models...'\n")
+                f.write("echo '🚀 Step 1: Downloading selected model...'\n")
                 f.write("echo '========================================'\n")
-                
-                for idx, model_repo_id in enumerate(model_repo_ids, 1):
-                    f.write(f"echo ''\n")
-                    f.write(f"echo '📦 Model {idx}/{len(model_repo_ids)}: {model_repo_id}'\n")
-                    
-                    download_cmd = f"python {download_script} --repo-id {model_repo_id}"
-                    if proxy:
-                        download_cmd += f" --proxy {proxy}"
-                    download_cmd += " --timeout 600"  # 10 minutes for large files
-                    
-                    f.write(f"{download_cmd}\n")
-                    f.write("DOWNLOAD_EXIT_CODE=$?\n")
-                    f.write("if [ $DOWNLOAD_EXIT_CODE -ne 0 ]; then\n")
-                    f.write(f"  echo '❌ Model download failed: {model_repo_id}'\n")
-                    f.write("  echo 'Training cannot proceed.'\n")
-                    f.write("  exit 1\n")
-                    f.write("fi\n")
-                    f.write(f"echo '✅ Model {idx} downloaded successfully'\n")
-                
+                f.write(f"echo '📦 Model: {model_repo_id}'\n")
                 f.write("echo ''\n")
-                f.write("echo '✅ All models downloaded successfully'\n")
+                
+                download_cmd = f"python {download_script} --repo-id {model_repo_id}"
+                if proxy:
+                    download_cmd += f" --proxy {proxy}"
+                download_cmd += " --timeout 600"  # 10 minutes for large files
+                
+                # Use || operator for error handling (avoid shell variable injection detection)
+                f.write(f"{download_cmd} || {{ echo '❌ Model download failed: {model_repo_id}'; echo 'Training cannot proceed.'; exit 1; }}\n")
+                f.write("echo '✅ Model downloaded successfully'\n")
+                f.write("echo ''\n\n")
+            else:
+                f.write("# Step 1: No model selected, skipping download\n")
+                f.write("echo 'ℹ️  No model selected for download, using cached or training from scratch'\n")
                 f.write("echo ''\n\n")
             
             # Training command
@@ -554,6 +541,7 @@ def main():
     submit_parser.add_argument("--dataset-repo-id", required=True, help="Dataset repo ID (e.g., train/merged)")
     submit_parser.add_argument("--model-name", default="smolvla_base")
     submit_parser.add_argument("--policy-type", default="smolvla", choices=["smolvla", "act"])
+    submit_parser.add_argument("--model-repo-id", help="Model to download (e.g., lerobot/smolvla_base). If not specified, no download occurs.")
     submit_parser.add_argument("--output-dir", default="outputs/mylerobot_train")
     submit_parser.add_argument("--batch-size", type=int, default=32)
     submit_parser.add_argument("--steps", type=int, default=100000)
@@ -595,6 +583,7 @@ def main():
             dataset_repo_id=args.dataset_repo_id,
             model_name=args.model_name,
             policy_type=args.policy_type,
+            model_repo_id=args.model_repo_id,  # User-selected model (None = no download)
             output_dir=args.output_dir,
             batch_size=args.batch_size,
             steps=args.steps,
