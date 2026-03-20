@@ -1595,5 +1595,93 @@ description: >
 
 ---
 
-**Last Updated**: 2026-03-19 17:48
-**Next Review**: 下次用户使用推理功能时
+## 🔄 每日记忆自动同步 (2026-03-20 10:03)
+
+### 问题发现
+
+用户询问：**"你昨天的记忆有上传到github吗"**
+
+**检查结果：**
+- ✅ MEMORY.md 已经上传（最后一次提交：2026-03-19 19:30）
+- ❌ memory/2026-03-19.md（昨天的详细日志）没有上传
+- ❌ 没有自动同步的 cron job
+
+### 问题根源
+
+1. **没有设置自动同步任务**
+   - OpenClaw cron 中只有训练监控任务
+   - HEARTBEAT.md 是空的，没有配置同步任务
+
+2. **需要手动补充提交**
+   - memory/2026-03-19.md 在本地但未提交
+
+### 解决方案
+
+**✅ 已实施：**
+
+1. **补充提交昨天的日志**
+   ```bash
+   git add memory/2026-03-19.md
+   git commit -m "docs: Add daily memory for 2026-03-19"
+   git push origin master
+   ```
+
+2. **创建自动同步 cron job**
+   ```bash
+   openclaw cron add \
+     --name "每日记忆同步" \
+     --cron "0 23 * * *" \
+     --session isolated \
+     --agent main \
+     --model glm-5 \
+     --message "请同步今天的记忆到 GitHub：1) 检查 memory/ 和 MEMORY.md 是否有更新；2) 如果有更新，提交并推送到 GitHub；3) 报告同步结果" \
+     --tz "Asia/Shanghai" \
+     --no-deliver
+   ```
+
+3. **Cron Job 详情**
+   - **Job ID**: `01f691cd-e7a0-48e4-9a2f-d01bdfbd74bc`
+   - **名称**: 每日记忆同步
+   - **频率**: 每日 23:00 (Asia/Shanghai)
+   - **下次运行**: 2026-03-20 23:00:00 CST
+   - **状态**: enabled
+
+### 同步内容
+
+**每日 23:00 自动同步：**
+- `memory/YYYY-MM-DD.md` - 每日日志
+- `MEMORY.md` - 长期记忆
+- 其他 workspace 中的记忆文件
+
+### 验证方法
+
+**如何确认自动同步工作：**
+1. 检查 OpenClaw cron list: `openclaw cron list`
+2. 查看下次运行时间
+3. 明天 23:00 后检查 GitHub 是否有新的 commit
+
+**手动触发同步：**
+```bash
+cd ~/.openclaw/workspace
+git add memory/ MEMORY.md
+git commit -m "chore: Manual memory sync"
+git push origin master
+```
+
+### 注意事项
+
+**如果同步失败：**
+1. 检查 v2ray 代理是否运行：`systemctl status v2ray`
+2. 检查网络连接：`curl -I https://github.com`
+3. 查看 cron job 日志：`openclaw cron runs <job_id>`
+
+**如果需要修改同步时间：**
+```bash
+# 编辑 cron job
+openclaw cron edit 01f691cd-e7a0-48e4-9a2f-d01bdfbd74bc --cron "0 22 * * *"
+```
+
+---
+
+**Last Updated**: 2026-03-20 10:05
+**Next Review**: 明天 23:00 验证自动同步是否正常工作
